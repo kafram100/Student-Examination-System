@@ -1,0 +1,267 @@
+:root {
+    --theme-bg: #f8fafc;
+    --theme-text: #1e293b;
+    --theme-card-bg: #ffffff;
+    --theme-card-border: #e2e8f0;
+    --theme-muted: #94a3b8;
+    --theme-link: #6366f1;
+    --theme-input-bg: #ffffff;
+    --theme-input-border: #e2e8f0;
+    --theme-table-stripe: #f1f5f9;
+    --theme-primary: #6366f1;
+    --theme-primary-light: #818cf8;
+    --theme-primary-dark: #4f46e5;
+    --theme-success: #10b981;
+    --theme-warning: #f59e0b;
+    --theme-danger: #ef4444;
+    --theme-info: #3b82f6;
+    --success-light: rgba(16, 185, 129, 0.15);
+    --warning-light: rgba(245, 158, 11, 0.15);
+    --info-light: rgba(59, 130, 246, 0.15);
+    --danger-light: rgba(239, 68, 68, 0.15);
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
+    --text-muted: #94a3b8;
+    --bg-primary: #ffffff;
+    --bg-secondary: #f8fafc;
+    --bg-tertiary: #f1f5f9;
+    --gray-50: #f8fafc;
+    --gray-100: #f1f5f9;
+    --gray-200: #e2e8f0;
+    --gray-300: #cbd5e1;
+    --gray-400: #94a3b8;
+    --gray-500: #64748b;
+    --gray-600: #475569;
+    --gray-700: #334155;
+    --gray-800: #1e293b;
+    --gray-900: #0f172a;
+}
+
+body.theme-dark {
+    --theme-bg: #0f172a;
+    --theme-text: #f1f5f9;
+    --theme-card-bg: #1e293b;
+    --theme-card-border: #334155;
+    --theme-muted: #94a3b8;
+    --theme-link: #818cf8;
+    --theme-input-bg: #0f172a;
+    --theme-input-border: #334155;
+    --theme-table-stripe: #1e293b;
+    --theme-primary: #818cf8;
+    --theme-primary-light: #a5b4fc;
+    --theme-primary-dark: #6366f1;
+    --theme-success: #34d399;
+    --theme-warning: #fbbf24;
+    --theme-danger: #f87171;
+    --theme-info: #60a5fa;
+    --success-light: rgba(52, 211, 153, 0.2);
+    --warning-light: rgba(251, 191, 36, 0.2);
+    --info-light: rgba(96, 165, 250, 0.2);
+    --danger-light: rgba(248, 113, 113, 0.2);
+    --text-primary: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+    --bg-primary: #1e293b;
+    --bg-secondary: #0f172a;
+    --bg-tertiary: #1e293b;
+    --gray-50: #0f172a;
+    --gray-100: #111827;
+    --gray-200: #1f2937;
+    --gray-300: #374151;
+    --gray-400: #4b5563;
+    --gray-500: #6b7280;
+    --gray-600: #9ca3af;
+    --gray-700: #cbd5e1;
+    --gray-800: #e2e8f0;
+    --gray-900: #f1f5f9;
+}
+
+body {
+    background-color: var(--theme-bg);
+    color: var(--theme-text);
+}
+
+a {
+    color: var(--theme-link);
+}
+
+.text-muted {
+    color: var(--theme-muted) !important;
+}
+
+.card:not(.bg-primary):not(.bg-success):not(.bg-info):not(.bg-warning):not(.bg-danger):not(.bg-secondary) {
+    background-color: var(--theme-card-bg);
+    border-color: var(--theme-card-border);
+    color: var(--theme-text);
+}
+
+.auth-card,
+.exam-card,
+.quick-action,
+.login-card {
+    background-color: var(--theme-card-bg);
+    border-color: var(--theme-card-border);
+    color: var(--theme-text);
+}
+
+.auth-footer {
+    background-color: var(--theme-table-stripe);
+    border-top-color: var(--theme-card-border);
+}
+
+.list-group-item:not(.active) {
+    background-color: var(--theme-card-bg);
+    border-color: var(--theme-card-border);
+    color: var(--theme-text);
+}
+
+.table {
+    color: var(--theme-text);
+}
+
+.table td,
+.table th {
+    border-color: var(--theme-card-border);
+}
+
+.table-striped > tbody > tr:nth-of-type(odd) {
+    background-color: var(--theme-table-stripe);
+}
+
+.form-control,
+.form-select,
+.input-group-text {
+    background-color: var(--theme-input-bg);
+    color: var(--theme-text);
+    border-color: var(--theme-input-border);
+}
+
+.form-control::placeholder {
+    color: var(--theme-muted);
+}
+
+.bg-light {
+    background-color: var(--theme-card-bg) !important;
+}
+
+label,
+.form-label,
+.form-check-label {
+    color: var(--theme-text);
+}
+
+small,
+.small,
+.text-secondary {
+    color: var(--theme-muted);
+}
+
+.form-floating input {
+    background-color: var(--theme-input-bg);
+    color: var(--theme-text);
+    border-color: var(--theme-input-border);
+}
+
+.form-floating input:focus {
+    background-color: var(--theme-input-bg);
+}
+
+.form-floating label {
+    color: var(--theme-muted);
+}
+
+.form-floating input:focus + label,
+.form-floating input:not(:placeholder-shown) + label {
+    background: var(--theme-card-bg);
+    color: var(--theme-link);
+}
+
+.form-icon,
+.password-toggle {
+    color: var(--theme-muted);
+}
+
+.form-control:focus,
+.form-select:focus {
+    box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.25);
+}
+
+.btn-outline-secondary,
+.btn-outline-light {
+    color: var(--theme-text);
+    border-color: var(--theme-input-border);
+}
+
+.btn-outline-secondary:hover,
+.btn-outline-light:hover {
+    background-color: var(--theme-table-stripe);
+    color: var(--theme-text);
+}
+
+.btn-primary {
+    background-color: var(--theme-primary);
+    border-color: var(--theme-primary);
+}
+
+.btn-primary:hover {
+    background-color: var(--theme-primary-dark);
+    border-color: var(--theme-primary-dark);
+}
+
+.btn-success {
+    background-color: var(--theme-success);
+    border-color: var(--theme-success);
+}
+
+.btn-warning {
+    background-color: var(--theme-warning);
+    border-color: var(--theme-warning);
+    color: #1e293b;
+}
+
+.btn-danger {
+    background-color: var(--theme-danger);
+    border-color: var(--theme-danger);
+}
+
+.btn-info {
+    background-color: var(--theme-info);
+    border-color: var(--theme-info);
+    color: #0f172a;
+}
+
+.theme-toggle-fab {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 2000;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--theme-card-border);
+    background: linear-gradient(135deg, var(--theme-primary) 0%, var(--theme-primary-light) 100%);
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+}
+
+.theme-toggle-fab svg {
+    width: 20px;
+    height: 20px;
+}
+
+.theme-toggle-fab:focus-visible {
+    outline: 2px solid var(--theme-link);
+    outline-offset: 3px;
+}
+
+@media (max-width: 576px) {
+    .theme-toggle-fab {
+        top: 12px;
+        right: 12px;
+        width: 40px;
+        height: 40px;
+    }
+}
