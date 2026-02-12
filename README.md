@@ -1,36 +1,57 @@
 # Student Online Examination System
 
-A web-based examination system built with PHP and MySQL.
+A web-based examination system built with PHP and MySQL for creating, taking, and grading exams.
 
 ## Features
-- **Lecturer**: Register/Login, Create Exams (Title, Duration), Add Questions (Multiple Choice), Publish Exams, View Results.
-- **Student**: Login with Exam Code & Index Number, Take Timed Exam, Auto-grading, View Result (if released).
-- **Security**: Timer enforced on backend, sessions for auth.
+- **Lecturer**: Register/Login, create exams, add questions (MCQ, theory, file upload), publish exams, view results, manual grading.
+- **Student**: Login with exam code & index number, take timed exams, autosave answers, resume ongoing attempts, view results (when released).
+- **Resilience**: Autosave + resume to protect against network drops.
+- **Security**: CSRF protection, secure sessions, and basic security headers.
 
-## Setup Instructions
+## Requirements
+- PHP 7.4+ (8.x recommended)
+- MySQL 5.7+ / MariaDB 10.3+
+- XAMPP/WAMP/LAMP (or any PHP-capable web server)
 
-1.  **Database Configuration**:
-    - Open `db.php` and update the database credentials (`$user`, `$pass`) if your MySQL configuration is different from the default (root, empty password).
+## Setup
+1. **Configure database**:
+   - Open `db.php` and update `$host`, `$db`, `$user`, `$pass` if needed.
+2. **Install tables**:
+   - Visit `http://localhost/student_exam_system/install.php`.
+3. **Create lecturer account**:
+   - Go to `http://localhost/student_exam_system/register.php`.
+4. **Students join exam**:
+   - Share `http://localhost/student_exam_system/index.php` with students.
+   - Students will need the **Exam Code** from your dashboard and their Index Number.
 
-2.  **Installation**:
-    - Move this entire folder to your web server's root directory (e.g., `htdocs` in XAMPP).
-    - Open your browser and navigate to: `http://localhost/student_exam_system/install.php`
-    - This will create the database and necessary tables.
+## Demo Seed (Optional)
+- `seed_user.php` creates an admin account:
+  - Username: `admin`
+  - Password: `admin123`
+- `seed_exam.php` creates a demo exam (draft).
 
-3.  **Usage**:
-    - **Lecturer**: Go to `http://localhost/student_exam_system/register.php` to create an account.
-    - **Student**: Provide students with the link `http://localhost/student_exam_system/index.php`. They will need the **Exam Code** (visible in your dashboard) and their Index Number.
+## Autosave + Resume
+While a student is taking an exam, answers are autosaved. If the network drops or the browser reloads, the student can continue from where they stopped.
 
-## File Structure
-- `auth.php`: Session helpers.
-- `db.php`: Database connection.
-- `install.php`: Setup script.
+## File Storage
+- Uploaded files are stored in `uploads/`.
+- See `uploads/README.md` for details.
+
+## Project Structure
+- `auth.php`: Session, CSRF, and security helpers.
+- `db.php`: Database connection (auto-creates DB if missing).
+- `install.php`: Schema installer.
 - `dashboard.php`: Lecturer main page.
 - `create_exam.php`: Create new exam.
 - `view_exam.php`: Manage exam and questions.
 - `add_question.php`: Add questions to exam.
-- `index.php`: Student login.
+- `index.php`: Student entry.
 - `take_exam.php`: Student exam interface.
-- `submit_exam.php`: Grading logic.
+- `submit_exam.php`: Submission + grading logic.
 - `student_result.php`: Student result view.
 - `exam_stats.php`: Lecturer stats view.
+
+## Database Scripts
+- Base schema: `sql/schema.sql`
+- Student table: `sql/students_table.sql`
+- Other updates: see `update_db_v*.php`
