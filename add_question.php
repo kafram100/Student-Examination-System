@@ -370,6 +370,93 @@ $csrf_token = generateCSRFToken();
         toggleCsvMode();
     </script>
     <script defer src="theme.js"></script>
+    <script src="js/offline-db.js"></script>
+    <script src="js/sync-manager.js"></script>
+    <script>
+        // Initialize offline form handling for add question
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.querySelector('form[method="POST"]');
+            const examId = <?= json_encode($exam_id) ?>;
+            
+            form.addEventListener('submit', async function(e) {
+                // Check if we have file upload - if so, can't do offline
+                const fileInput = form.querySelector('input[type="file"]');
+                const hasFile = fileInput && fileInput.files && fileInput.files.length > 0;
+                const useCsv = document.getElementById('use_csv')?.checked;
+                
+                if (hasFile || useCsv) {
+                    // File upload or CSV requires online - let normal form submission proceed
+                    return;
+                }
+                
+                // Validate MCQ fields
+                const qType = document.getElementById('q_type').value;
+                if (qType === 'mcq') {
+                    const optionA = document.getElementById('option_a').value.trim();
+                    const optionB = document.getElementById('option_b').value.trim();
+                    const correctOption = document.getElementById('correct_option').value;
+                    
+                    if (!optionA || !optionB || !correctOption) {
+                        alert('Please fill in at least Option A, Option B, and select the correct option.');
+                        e.preventDefault();
+                        return;
+                    }
+                }
+                
+                // Prevent default submission
+                e.preventDefault();
+                
+                const submitBtn = form.querySelector('button[type="submit"]');
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+                
+                try {
+                    // Get form data
+                    const formData = new FormData(form);
+                    const data = {};
+                    formData.forEach((value, key) => {
+                        data[key] = value;
+                    });
+                    data.exam_id = examId;
+                    
+                    // Queue the operation
+                    await offlineDB.addToSyncQueue('add_question', 'questions', data);
+                    
+                    // Update UI
+                    const pendingCount = await offlineDB.getPendingCount();
+                    if (typeof syncManager !== 'undefined') {
+                        syncManager.updatePendingCount(pendingCount);
+                        
+                        if (syncManager.isOnline) {
+                            syncManager.showNotification('Question saved and syncing...', 'success');
+                            await syncManager.sync();
+                            setTimeout(() => {
+                                window.location.href = 'view_exam.php?id=' + examId + '&synced=1';
+                            }, 1000);
+                        } else {
+                            syncManager.showNotification('Question saved locally. Will sync when online.', 'warning');
+                            setTimeout(() => {
+                                window.location.href = 'view_exam.php?id=' + examId + '&offline=1';
+                            }, 1500);
+                        }
+                    } else {
+                        alert('Question saved locally. Will sync when online.');
+                        window.location.href = 'view_exam.php?id=' + examId + '&offline=1';
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = 'Save Question';
+                    
+                    if (typeof syncManager !== 'undefined') {
+                        syncManager.showNotification('Failed to save. Please try again.', 'danger');
+                    } else {
+                        alert('Failed to save. Please try again.');
+                    }
+                }
+            });
+        });
+    </script>
 </body>
 </html>
 

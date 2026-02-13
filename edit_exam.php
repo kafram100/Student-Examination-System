@@ -226,6 +226,68 @@ $csrf_token = generateCSRFToken();
         toggleAssessmentFields();
     </script>
     <script defer src="theme.js"></script>
+    <script src="js/offline-db.js"></script>
+    <script src="js/sync-manager.js"></script>
+    <script>
+        // Initialize offline form handling for edit exam
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.querySelector('form[method="POST"]');
+            const examId = <?= json_encode($exam_id) ?>;
+            
+            form.addEventListener('submit', async function(e) {
+                // Prevent default submission
+                e.preventDefault();
+                
+                const submitBtn = form.querySelector('button[type="submit"]');
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+                
+                try {
+                    // Get form data
+                    const formData = new FormData(form);
+                    const data = {};
+                    formData.forEach((value, key) => {
+                        data[key] = value;
+                    });
+                    
+                    // Queue the operation
+                    await offlineDB.addToSyncQueue('update_exam', 'exams', data, examId);
+                    
+                    // Update UI
+                    const pendingCount = await offlineDB.getPendingCount();
+                    if (typeof syncManager !== 'undefined') {
+                        syncManager.updatePendingCount(pendingCount);
+                        
+                        if (syncManager.isOnline) {
+                            syncManager.showNotification('Assessment updated and syncing...', 'success');
+                            await syncManager.sync();
+                            setTimeout(() => {
+                                window.location.href = 'view_exam.php?id=' + examId + '&synced=1';
+                            }, 1000);
+                        } else {
+                            syncManager.showNotification('Assessment updated locally. Will sync when online.', 'warning');
+                            setTimeout(() => {
+                                window.location.href = 'view_exam.php?id=' + examId + '&offline=1';
+                            }, 1500);
+                        }
+                    } else {
+                        alert('Assessment updated locally. Will sync when online.');
+                        window.location.href = 'view_exam.php?id=' + examId + '&offline=1';
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = 'Update Assessment';
+                    
+                    if (typeof syncManager !== 'undefined') {
+                        syncManager.showNotification('Failed to save. Please try again.', 'danger');
+                    } else {
+                        alert('Failed to save. Please try again.');
+                    }
+                }
+            });
+        });
+    </script>
 </body>
 </html>
 

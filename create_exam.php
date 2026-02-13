@@ -254,6 +254,79 @@ $csrf_token = generateCSRFToken();
         toggleAssessmentFields();
     </script>
     <script defer src="theme.js"></script>
+    <script src="js/offline-db.js"></script>
+    <script src="js/sync-manager.js"></script>
+    <script>
+        // Initialize offline form handling for create exam
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.querySelector('form[method="POST"]');
+            const originalSubmit = form.onsubmit;
+            
+            form.addEventListener('submit', async function(e) {
+                // Check if we have file upload - if so, can't do offline
+                const fileInput = form.querySelector('input[type="file"]');
+                const hasFile = fileInput && fileInput.files && fileInput.files.length > 0;
+                
+                if (hasFile) {
+                    // File upload requires online - let normal form submission proceed
+                    return;
+                }
+                
+                // Prevent default submission
+                e.preventDefault();
+                
+                const submitBtn = form.querySelector('button[type="submit"]');
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+                
+                try {
+                    // Get form data
+                    const formData = new FormData(form);
+                    const data = {};
+                    formData.forEach((value, key) => {
+                        data[key] = value;
+                    });
+                    
+                    // Queue the operation
+                    await offlineDB.addToSyncQueue('create_exam', 'exams', data);
+                    
+                    // Update UI
+                    const pendingCount = await offlineDB.getPendingCount();
+                    if (typeof syncManager !== 'undefined') {
+                        syncManager.updatePendingCount(pendingCount);
+                        
+                        if (syncManager.isOnline) {
+                            syncManager.showNotification('Assessment saved and syncing...', 'success');
+                            await syncManager.sync();
+                            // Redirect after successful sync
+                            setTimeout(() => {
+                                window.location.href = 'dashboard.php?synced=1';
+                            }, 1000);
+                        } else {
+                            syncManager.showNotification('Assessment saved locally. Will sync when online.', 'warning');
+                            setTimeout(() => {
+                                window.location.href = 'dashboard.php?offline=1';
+                            }, 1500);
+                        }
+                    } else {
+                        // Fallback if syncManager not loaded
+                        alert('Assessment saved locally. Will sync when online.');
+                        window.location.href = 'dashboard.php?offline=1';
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = 'Create Assessment';
+                    
+                    if (typeof syncManager !== 'undefined') {
+                        syncManager.showNotification('Failed to save. Please try again.', 'danger');
+                    } else {
+                        alert('Failed to save. Please try again.');
+                    }
+                }
+            });
+        });
+    </script>
 </body>
 </html>
 

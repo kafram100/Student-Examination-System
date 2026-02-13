@@ -214,6 +214,40 @@ $csrf_token = generateCSRFToken();
             color: white;
         }
         
+        /* Sync Status Styles */
+        .sync-status-bar {
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--gray-200);
+            padding: 0.75rem 0;
+            margin-bottom: 1rem;
+        }
+        .connection-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        .connection-status.online {
+            color: var(--success);
+        }
+        .connection-status.offline {
+            color: var(--warning);
+        }
+        .pending-sync-count {
+            background: var(--warning);
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.125rem 0.5rem;
+            border-radius: var(--radius-full);
+            margin-left: 0.5rem;
+        }
+        .sync-now-btn {
+            font-size: 0.875rem;
+            padding: 0.375rem 0.75rem;
+        }
+        
         /* Mobile Responsive Styles */
         @media (max-width: 768px) {
             .dashboard-title {
@@ -319,6 +353,22 @@ $csrf_token = generateCSRFToken();
             </div>
         </div>
     </nav>
+
+    <!-- Sync Status Bar -->
+    <div class="sync-status-bar">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="connection-status online" id="connectionStatus">
+                    <i class="bi bi-wifi"></i>
+                    <span>Online</span>
+                    <span class="pending-sync-count" id="pendingSyncCount" style="display: none;">0</span>
+                </div>
+                <button class="btn btn-primary btn-sm sync-now-btn" id="syncNowBtn" style="display: none;" onclick="syncManager.manualSync()">
+                    <i class="bi bi-arrow-repeat me-1"></i>Sync Now
+                </button>
+            </div>
+        </div>
+    </div>
 
     <div class="container py-4">
         <!-- Page Header -->
@@ -433,6 +483,88 @@ $csrf_token = generateCSRFToken();
         <?php endif; ?>
     </div>
     <script defer src="theme.js"></script>
+    <script src="js/offline-db.js"></script>
+    <script src="js/sync-manager.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Initialize offline DB
+            await offlineDB.init();
+            
+            // Update pending count on load
+            const pendingCount = await offlineDB.getPendingCount();
+            updateSyncUI(pendingCount);
+            
+            // Listen for sync status changes
+            if (typeof syncManager !== 'undefined') {
+                syncManager.onStatusChange(function(status) {
+                    if (status.type === 'connection') {
+                        updateConnectionStatus(status.isOnline);
+                    } else if (status.type === 'sync') {
+                        // Sync status changed
+                    }
+                });
+                
+                // Initial connection status
+                updateConnectionStatus(syncManager.isOnline);
+            }
+            
+            // Check for URL params
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('synced')) {
+                showSyncAlert('All changes synced successfully!', 'success');
+                // Clean URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+            } else if (urlParams.has('offline')) {
+                showSyncAlert('Changes saved locally. Will sync when online.', 'warning');
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        });
+        
+        function updateConnectionStatus(isOnline) {
+            const statusEl = document.getElementById('connectionStatus');
+            if (isOnline) {
+                statusEl.classList.remove('offline');
+                statusEl.classList.add('online');
+                statusEl.innerHTML = '<i class="bi bi-wifi"></i><span>Online</span><span class="pending-sync-count" id="pendingSyncCount" style="display: none;">0</span>';
+            } else {
+                statusEl.classList.remove('online');
+                statusEl.classList.add('offline');
+                statusEl.innerHTML = '<i class="bi bi-wifi-off"></i><span>Offline</span><span class="pending-sync-count" id="pendingSyncCount" style="display: none;">0</span>';
+            }
+            // Restore pending count
+            updateSyncUI(document.getElementById('pendingSyncCount')?.textContent || 0);
+        }
+        
+        function updateSyncUI(count) {
+            const countEl = document.getElementById('pendingSyncCount');
+            const syncBtn = document.getElementById('syncNowBtn');
+            
+            if (count > 0) {
+                countEl.textContent = count;
+                countEl.style.display = 'inline-block';
+                syncBtn.style.display = 'inline-block';
+            } else {
+                countEl.style.display = 'none';
+                syncBtn.style.display = 'none';
+            }
+        }
+        
+        function showSyncAlert(message, type) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            const container = document.querySelector('.container.py-4');
+            container.insertBefore(alertDiv, container.firstChild);
+            
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 5000);
+        }
+    </script>
 </body>
 </html>
 
