@@ -6,6 +6,7 @@ A web-based examination system built with PHP and MySQL for creating, taking, an
 - **Lecturer**: Register/Login, create exams, add questions (MCQ, theory, file upload), publish exams, view results, manual grading.
 - **Student**: Login with exam code & index number, take timed exams, autosave answers, resume ongoing attempts, view results (when released).
 - **Resilience**: Autosave + resume to protect against network drops.
+- **Offline Mode (Lecturer)**: Create and edit exams/questions while offline and sync later.
 - **Security**: CSRF protection, secure sessions, and basic security headers.
 
 ## Requirements
@@ -33,6 +34,16 @@ A web-based examination system built with PHP and MySQL for creating, taking, an
 ## Autosave + Resume
 While a student is taking an exam, answers are autosaved. If the network drops or the browser reloads, the student can continue from where they stopped.
 
+## Offline Mode (Lecturer)
+Lecturers can create and edit exams/questions while offline. Changes are queued locally and sync automatically when the connection returns.
+
+Supported actions:
+- Create and edit exams without file uploads.
+- Add and edit questions without file uploads or CSV import.
+- Manual sync from the dashboard.
+
+For details, see `docs/OFFLINE.md`.
+
 ## File Storage
 - Uploaded files are stored in `uploads/`.
 - See `uploads/README.md` for details.
@@ -41,6 +52,8 @@ While a student is taking an exam, answers are autosaved. If the network drops o
 - `auth.php`: Session, CSRF, and security helpers.
 - `db.php`: Database connection (auto-creates DB if missing).
 - `install.php`: Schema installer.
+- `api/`: Offline sync endpoints.
+- `js/`: Offline IndexedDB + sync manager.
 - `dashboard.php`: Lecturer main page.
 - `create_exam.php`: Create new exam.
 - `view_exam.php`: Manage exam and questions.
