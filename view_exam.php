@@ -879,6 +879,10 @@ $student_link = "student_login.php?code=" . urlencode($exam['exam_code']);
                                     </a>
                                 </div>
                             <?php endif; ?>
+                        <?php elseif ($q['q_type'] === 'fill_in'): ?>
+                            <div class="question-hint">
+                                <i class="bi bi-textarea-resize me-2"></i>Students will fill in the blank
+                            </div>
                         <?php endif; ?>
                     </div>
                 <?php endforeach; ?>
