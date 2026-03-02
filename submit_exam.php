@@ -17,6 +17,50 @@ checkCSRF();
 $student_index = $_SESSION['student_index'];
 $exam_id = $_SESSION['exam_id'];
 
+// Fetch Exam Details to check if proctoring was required
+$stmt = $pdo->prepare("SELECT * FROM exams WHERE id = ?");
+$stmt->execute([$exam_id]);
+$exam = $stmt->fetch();
+
+// Check if proctoring was required for this exam type
+$requires_proctoring = false;
+if (isset($exam['exam_type'])) {
+    $exam_type = strtolower($exam['exam_type']);
+    if (strpos($exam_type, 'examination') !== false || strpos($exam_type, 'mid-semester') !== false || strpos($exam_type, 'mid semester') !== false) {
+        $requires_proctoring = true;
+    }
+}
+
+// If proctoring was required, check if session was properly established
+if ($requires_proctoring && !isset($_SESSION['proctoring_enabled'])) {
+    // Log security violation
+    $stmt = $pdo->prepare(
+        "INSERT INTO exam_security_logs 
+        (exam_attempt_id, user_id, activity_type, description, timestamp, ip_address, severity) 
+        VALUES (?, ?, ?, ?, NOW(), ?, 'critical')"
+    );
+    $stmt->execute([
+        $attempt['id'] ?? 0,
+        $_SESSION['user_id'] ?? 0,
+        'proctoring_bypass',
+        'Attempted to submit exam without proper proctoring session',
+        $_SERVER['REMOTE_ADDR']
+    ]);
+    
+    // Redirect to violation page
+    header("Location: exam_terminated.php?reason=Proctoring bypass attempt detected");
+    exit;
+}
+
+// Mark proctoring as completed if it was required
+if ($requires_proctoring && isset($_SESSION['proctoring_enabled'])) {
+    $stmt = $pdo->prepare("UPDATE exam_sessions_proctoring SET proctoring_status = 'completed', end_time = NOW() WHERE exam_attempt_id = ?");
+    $stmt->execute([$attempt['id'] ?? 0]);
+    
+    // Clear proctoring session
+    unset($_SESSION['proctoring_enabled']);
+}
+
 // Get Attempt
 $stmt = $pdo->prepare("SELECT * FROM attempts WHERE exam_id = ? AND student_index = ? AND status = 'ongoing'");
 $stmt->execute([$exam_id, $student_index]);

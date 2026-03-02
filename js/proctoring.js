@@ -273,6 +273,37 @@ class ExamProctoring {
         
         // Additional security measures during exam
         this.enforceSecurityMeasures();
+        
+        // Make an AJAX call to set the session variable
+        this.enableProctoringSession();
+    }
+    
+    enableProctoringSession() {
+        fetch('enable_proctoring.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'token=' + encodeURIComponent(this.getCSRFToken())
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
+                console.error('Failed to enable proctoring session:', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error enabling proctoring session:', error);
+        });
+    }
+    
+    getCSRFToken() {
+        // Try to get CSRF token from a meta tag or hidden input
+        const tokenInput = document.querySelector('input[name="csrf_token"]');
+        if (tokenInput) {
+            return tokenInput.value;
+        }
+        return '';
     }
     
     enterFullscreen() {

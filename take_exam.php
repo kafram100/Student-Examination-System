@@ -15,6 +15,26 @@ $stmt = $pdo->prepare("SELECT * FROM exams WHERE id = ?");
 $stmt->execute([$exam_id]);
 $exam = $stmt->fetch();
 
+// Check if proctoring is required for this exam type
+$requires_proctoring = false;
+if (isset($exam['exam_type'])) {
+    $exam_type = strtolower($exam['exam_type']);
+    if (strpos($exam_type, 'examination') !== false || strpos($exam_type, 'mid-semester') !== false || strpos($exam_type, 'mid semester') !== false) {
+        $requires_proctoring = true;
+    }
+}
+
+// If proctoring is required but not enabled, redirect
+if ($requires_proctoring && !isset($_SESSION['proctoring_enabled'])) {
+    $_SESSION['exam_id'] = $exam_id;  // Store exam ID for after proctoring check
+    $_SESSION['student_index'] = $student_index;
+}
+
+// Fetch Exam Details
+$stmt = $pdo->prepare("SELECT * FROM exams WHERE id = ?");
+$stmt->execute([$exam_id]);
+$exam = $stmt->fetch();
+
 if (!$exam || !$exam['is_published']) {
     die("Exam not available.");
 }
@@ -48,6 +68,9 @@ if ($active_attempt) {
     $stmt = $pdo->prepare("SELECT * FROM attempts WHERE exam_id = ? AND student_index = ? AND status = 'ongoing'");
     $stmt->execute([$exam_id, $student_index]);
     $attempt = $stmt->fetch();
+    
+    // Set the exam attempt ID in session for proctoring
+    $_SESSION['exam_attempt_id'] = $attempt['id'];
 }
 
 // Calculate remaining time
@@ -194,16 +217,26 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             }
         }
         
-        // Show proctoring modal on load
+        // Show proctoring modal on load if required
         window.addEventListener('load', () => {
-            // Show the proctoring modal
-            document.getElementById('proctoringModal').style.display = 'flex';
+            // Check if proctoring is required for this exam type
+            const examTitle = document.querySelector('h2')?.textContent || '';
+            const examTypeRequired = <?= json_encode($requires_proctoring) ?>;
             
-            // Request camera and mic access
-            initializeProctoring();
-            
-            // Set up the start button
-            document.getElementById('start-proctoring-btn').addEventListener('click', startExamWithProctoring);
+            if (examTypeRequired) {
+                // Show the proctoring modal
+                document.getElementById('proctoringModal').style.display = 'flex';
+                
+                // Request camera and mic access
+                initializeProctoring();
+                
+                // Set up the start button
+                document.getElementById('start-proctoring-btn').addEventListener('click', startExamWithProctoring);
+            } else {
+                // Skip proctoring, start exam normally
+                updateTimer();
+                initAutosave();
+            }
         });
         
         async function initializeProctoring() {
