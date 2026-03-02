@@ -412,6 +412,15 @@ $csrf_token = generateCSRFToken();
                 </a>
             </div>
             <div class="col-md-4">
+                <a href="exam_activity_report.php" class="quick-action">
+                    <i class="bi bi-activity" style="background: var(--info);"></i>
+                    <div>
+                        <div class="fw-semibold">Activity Reports</div>
+                        <small class="text-muted">View exam activity logs and incidents</small>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-4">
                 <div class="quick-action" style="cursor: default;">
                     <i class="bi bi-bar-chart-fill" style="background: var(--success);"></i>
                     <div>

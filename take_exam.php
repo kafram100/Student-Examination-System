@@ -199,6 +199,80 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
     </style>
     <script src="js/proctoring.js"></script>
     <script>
+        // Anti-screenshot, anti-copy measures
+        document.addEventListener('contextmenu', function(e) {
+            logActivity('right_click', 'User attempted to right-click', 'medium');
+            e.preventDefault();
+        });
+        
+        document.addEventListener('keydown', function(e) {
+            // Prevent Print Screen, F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U, PrntScr
+            if (e.keyCode === 123 || // F12
+                (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74)) || // Ctrl+Shift+I/J
+                (e.ctrlKey && e.keyCode === 85) || // Ctrl+U
+                e.keyCode === 44 || // Print Screen
+                (e.ctrlKey && [67, 86, 88].includes(e.keyCode)) // Ctrl+C, V, X
+            ) {
+                e.preventDefault();
+                
+                let activityType = 'other';
+                let description = 'User attempted to use keyboard shortcut';
+                
+                if (e.keyCode === 123) { activityType = 'dev_tools'; description = 'User attempted to open developer tools (F12)'; }
+                else if (e.ctrlKey && e.shiftKey && e.keyCode === 73) { activityType = 'dev_tools'; description = 'User attempted to open developer tools (Ctrl+Shift+I)'; }
+                else if (e.ctrlKey && e.shiftKey && e.keyCode === 74) { activityType = 'dev_tools'; description = 'User attempted to open developer tools (Ctrl+Shift+J)'; }
+                else if (e.ctrlKey && e.keyCode === 85) { activityType = 'dev_tools'; description = 'User attempted to view page source (Ctrl+U)'; }
+                else if (e.keyCode === 44) { activityType = 'screenshot_attempt'; description = 'User attempted to take screenshot (Print Screen)'; }
+                else if (e.ctrlKey && e.keyCode === 67) { activityType = 'copy_attempt'; description = 'User attempted to copy content (Ctrl+C)'; }
+                else if (e.ctrlKey && e.keyCode === 86) { activityType = 'paste_attempt'; description = 'User attempted to paste content (Ctrl+V)'; }
+                else if (e.ctrlKey && e.keyCode === 88) { activityType = 'cut_attempt'; description = 'User attempted to cut content (Ctrl+X)'; }
+                
+                logActivity(activityType, description, 'medium');
+            }
+        });
+        
+        // Prevent drag and drop
+        document.addEventListener('dragstart', function(e) {
+            logActivity('drag_attempt', 'User attempted to drag content', 'low');
+            e.preventDefault();
+        });
+        
+        // Prevent text selection
+        document.addEventListener('selectstart', function(e) {
+            logActivity('selection_attempt', 'User attempted to select text', 'low');
+            e.preventDefault();
+        });
+        
+        // Prevent print
+        window.addEventListener('beforeprint', function(e) {
+            logActivity('print_attempt', 'User attempted to print', 'medium');
+            e.preventDefault();
+        });
+        
+        // Prevent screenshot via CSS
+        document.documentElement.style.cssText += '; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;';
+        
+        // Function to log activity
+        function logActivity(type, description, severity) {
+            const formData = new FormData();
+            formData.append('activity_type', type);
+            formData.append('description', description);
+            formData.append('severity', severity);
+            formData.append('exam_attempt_id', <?= $attempt['id'] ?? 0 ?>);
+            formData.append('user_id', <?= $_SESSION['user_id'] ?? 0 ?>);
+            formData.append('csrf_token', document.querySelector('input[name="csrf_token"]')?.value || '');
+            
+            fetch('log_exam_activity.php', {
+                method: 'POST',
+                body: formData
+            }).catch(err => console.error('Failed to log activity:', err));
+        }
+        
+        // Monitor for multiple device usage
+        window.addEventListener('focus', function() {
+            // Record focus events that might indicate tab switching
+            logActivity('window_focus', 'Window gained focus', 'low');
+        });
         let timeLeft = <?= $remaining_sec ?>;
         let isUnlimited = <?= $is_unlimited ? 'true' : 'false' ?>;
         
