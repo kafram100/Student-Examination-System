@@ -24,6 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($user && password_verify($password, $user['password'])) {
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $user['username'];
+            $_SESSION['role'] = $user['role'] ?? 'lecturer';
             session_regenerate_id(true);
             rotateCSRFToken();
             resetRateLimit('login_' . $_SERVER['REMOTE_ADDR']);

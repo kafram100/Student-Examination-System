@@ -22,14 +22,12 @@ $stmt = $pdo->prepare("
         esp.suspicious_activity_count,
         esp.proctoring_status,
         u.username as student_username,
-        e.title as exam_title,
-        ea.started_at,
-        ea.time_left
+        e.title as exam_title
     FROM exam_sessions_proctoring esp
     JOIN users u ON esp.student_id = u.id
-    JOIN exam_attempts ea ON esp.exam_attempt_id = ea.id
-    JOIN exams e ON ea.exam_id = e.id
-    WHERE esp.lecturer_id = ?
+    JOIN attempts a ON esp.exam_attempt_id = a.id
+    JOIN exams e ON a.exam_id = e.id
+    WHERE e.user_id = ?
     AND esp.proctoring_status IN ('active', 'flagged')
     ORDER BY esp.start_time DESC
 ");
@@ -43,9 +41,9 @@ $stmt = $pdo->prepare("
         u.username as student_username,
         e.title as exam_title
     FROM exam_security_logs esl
-    JOIN exam_attempts ea ON esl.exam_attempt_id = ea.id
-    JOIN users u ON ea.user_id = u.id
-    JOIN exams e ON ea.exam_id = e.id
+    JOIN attempts a ON esl.exam_attempt_id = a.id
+    JOIN users u ON esl.user_id = u.id
+    JOIN exams e ON a.exam_id = e.id
     WHERE e.user_id = ?
     ORDER BY esl.timestamp DESC
     LIMIT 20

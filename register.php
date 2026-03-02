@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = 'Username or Email already exists.';
             } else {
                 $hash = password_hash($password, PASSWORD_ARGON2ID);
-                $stmt = $pdo->prepare("INSERT INTO users (username, email, password) VALUES (?, ?, ?)");
+                $stmt = $pdo->prepare("INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, 'lecturer')");
                 if ($stmt->execute([$username, $email, $hash])) {
                     header('Location: login.php?registered=1');
                     exit;
