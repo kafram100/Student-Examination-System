@@ -2,11 +2,12 @@
 require 'db.php';
 session_start();
 
-if (!isset($_SESSION['student_index']) || !isset($_SESSION['exam_id'])) {
+if (!isset($_SESSION['student_fullname']) || !isset($_SESSION['student_index']) || !isset($_SESSION['exam_id'])) {
     header("Location: student_login.php");
     exit;
 }
 
+$student_fullname = $_SESSION['student_fullname'];
 $student_index = $_SESSION['student_index'];
 $exam_id = $_SESSION['exam_id'];
 
@@ -15,10 +16,8 @@ $stmt = $pdo->prepare("SELECT title, results_released FROM exams WHERE id = ?");
 $stmt->execute([$exam_id]);
 $exam = $stmt->fetch();
 
-// Fetch Student Info
-$stmt = $pdo->prepare("SELECT full_name FROM students WHERE index_number = ?");
-$stmt->execute([$student_index]);
-$student = $stmt->fetch();
+// Use the student info from the attempt record
+$student = ['full_name' => $student_fullname];
 
 // Fetch Attempt Info (Get the most recent completed attempt)
 $stmt = $pdo->prepare("SELECT * FROM attempts WHERE exam_id = ? AND student_index = ? ORDER BY id DESC LIMIT 1");

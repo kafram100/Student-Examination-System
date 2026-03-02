@@ -2,7 +2,7 @@
 require 'db.php';
 require 'auth.php';
 
-if (!isset($_SESSION['student_index']) || !isset($_SESSION['exam_id'])) {
+if (!isset($_SESSION['student_fullname']) || !isset($_SESSION['student_index']) || !isset($_SESSION['exam_id'])) {
     header("Location: student_login.php");
     exit;
 }

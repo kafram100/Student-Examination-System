@@ -1,108 +1,206 @@
+<?php
+session_start();
+// If user is already logged in as lecturer, redirect to dashboard
+if (isset($_SESSION['user_id'])) {
+    header('Location: dashboard.php');
+    exit;
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student Online Examination System</title>
+    <title>Student Exam System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link href="theme.css" rel="stylesheet">
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .hero { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 60px 0; }
-        .feature-icon { font-size: 2rem; color: #764ba2; margin-bottom: 20px; }
-        .card { border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.1); transition: transform 0.2s; }
-        .card:hover { transform: translateY(-5px); }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        
+        .hero-container {
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+            animation: fadeIn 0.6s ease;
+        }
+        
+        .hero-card {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            padding: 3rem 2rem;
+            overflow: hidden;
+        }
+        
+        .hero-icon {
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            font-size: 2.5rem;
+            color: white;
+        }
+        
+        .hero-title {
+            font-size: 1.875rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 1rem;
+        }
+        
+        .hero-subtitle {
+            color: #6b7280;
+            font-size: 1rem;
+            margin-bottom: 2rem;
+            line-height: 1.6;
+        }
+        
+        .exam-code-form {
+            background: #f9fafb;
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 1rem;
+            transition: all 0.2s;
+            margin-bottom: 1rem;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+        }
+        
+        .btn-primary {
+            width: 100%;
+            padding: 1rem;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px -5px rgba(99, 102, 241, 0.4);
+        }
+        
+        .btn-outline {
+            width: 100%;
+            padding: 1rem;
+            background: transparent;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            color: #6366f1;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn-outline:hover {
+            background: #f9fafb;
+            border-color: #6366f1;
+        }
+        
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 1.5rem 0;
+        }
+        
+        .divider::before,
+        .divider::after {
+            content: "";
+            flex: 1;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .divider-text {
+            padding: 0 1rem;
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @media (max-width: 576px) {
+            body { padding: 0.5rem; }
+            .hero-container { max-width: 100%; }
+            .hero-card { padding: 2rem 1.5rem; }
+            .hero-title { font-size: 1.5rem; }
+            .hero-icon { width: 80px; height: 80px; font-size: 2rem; }
+        }
     </style>
 </head>
 <body>
-
-    <!-- Hero Section -->
-    <header class="hero text-center">
-        <div class="container">
-            <h1 class="display-4 fw-bold mb-3">Student Online Examination System</h1>
-            <p class="lead mb-4">A secure, timed, and automated platform for conducting online assessments.</p>
-            <div class="d-flex justify-content-center gap-3">
-                <a href="#students" class="btn btn-light btn-lg text-primary fw-bold">I am a Student</a>
-                <a href="#lecturers" class="btn btn-outline-light btn-lg">I am a Lecturer</a>
+    <div class="hero-container">
+        <div class="hero-card">
+            <div class="hero-icon">
+                <i class="bi bi-mortarboard-fill"></i>
             </div>
+            
+            <h1 class="hero-title">Student Exam System</h1>
+            <p class="hero-subtitle">
+                Take your exams securely online. Enter your exam code to get started.
+            </p>
+            
+            <div class="exam-code-form">
+                <form action="student_login.php" method="GET">
+                    <input 
+                        type="text" 
+                        name="exam_code" 
+                        placeholder="Enter your exam code" 
+                        class="form-input" 
+                        required 
+                        maxlength="20"
+                        autocomplete="off"
+                    >
+                    <button type="submit" class="btn-primary">
+                        <i class="bi bi-box-arrow-in-right me-2"></i>Start Exam
+                    </button>
+                </form>
+            </div>
+            
+            <div class="divider">
+                <span class="divider-text">OR</span>
+            </div>
+            
+            <a href="login.php" class="btn-outline">
+                <i class="bi bi-person-circle me-2"></i>Lecturer Login
+            </a>
         </div>
-    </header>
-
-    <!-- Content -->
-    <div class="container my-5">
-        
-        <!-- How It Works -->
-        <div class="row text-center mb-5">
-            <div class="col-md-4">
-                <div class="card p-4 h-100">
-                    <div class="feature-icon">📝</div>
-                    <h4>Create Exams</h4>
-                    <p class="text-muted">Lecturers can easily create timed multiple-choice exams with automatic grading.</p>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card p-4 h-100">
-                    <div class="feature-icon">⏱️</div>
-                    <h4>Timed Assessments</h4>
-                    <p class="text-muted">Students take exams with a strict server-side timer to ensure fairness.</p>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card p-4 h-100">
-                    <div class="feature-icon">📊</div>
-                    <h4>Instant Results</h4>
-                    <p class="text-muted">Scores are calculated immediately. Lecturers control when results are released.</p>
-                </div>
-            </div>
-        </div>
-
-        <hr class="my-5">
-
-        <!-- Roles Section -->
-        <div class="row align-items-center mb-5" id="students">
-            <div class="col-md-6 order-md-2">
-                <img src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80" alt="Student" class="img-fluid rounded shadow-lg">
-            </div>
-            <div class="col-md-6 order-md-1">
-                <h2 class="text-primary">For Students</h2>
-                <p class="lead">Ready to take your exam?</p>
-                <ul class="list-unstyled">
-                    <li class="mb-2">✅ Get the <strong>Exam Code</strong> from your lecturer.</li>
-                    <li class="mb-2">✅ Have your <strong>Index Number</strong> ready.</li>
-                    <li class="mb-2">✅ Ensure you have a stable internet connection.</li>
-                </ul>
-                <a href="student_login.php" class="btn btn-primary btn-lg mt-3">Go to Exam Portal</a>
-            </div>
-        </div>
-
-        <div class="row align-items-center" id="lecturers">
-            <div class="col-md-6">
-                <img src="https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80" alt="Lecturer" class="img-fluid rounded shadow-lg">
-            </div>
-            <div class="col-md-6">
-                <h2 class="text-success">For Lecturers</h2>
-                <p class="lead">Manage your assessments efficiently.</p>
-                <ul class="list-unstyled">
-                    <li class="mb-2">🛠️ Create and edit questions.</li>
-                    <li class="mb-2">📈 Monitor student performance in real-time.</li>
-                    <li class="mb-2">🔒 Secure exam links and timer enforcement.</li>
-                </ul>
-                <div class="d-flex gap-2 mt-3">
-                    <a href="login.php" class="btn btn-success btn-lg">Lecturer Login</a>
-                    <a href="register.php" class="btn btn-outline-secondary btn-lg">Register</a>
-                </div>
-            </div>
-        </div>
-
     </div>
-
-    <!-- Footer -->
-    <footer class="bg-dark text-white text-center py-4 mt-5">
-        <p class="mb-0">&copy; <?= date('Y') ?> Student Online Examination System. All rights reserved.</p>
-    </footer>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
     <script defer src="theme.js"></script>
 </body>
 </html>
-

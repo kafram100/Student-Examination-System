@@ -1,294 +1,305 @@
 <?php
 require 'db.php';
-require 'auth.php';
+session_start();
 
-$exam_code = isset($_GET['code']) ? $_GET['code'] : '';
-$error = '';
-$message = '';
-$show_registration = false;
+// Clear any existing student session data
+unset($_SESSION['student_index']);
+unset($_SESSION['student_fullname']);
 
-// Initialize variables
-$index_number = '';
-$full_name = '';
-$department = '';
-$program = '';
+$exam_code = $_GET['exam_code'] ?? '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Validate CSRF token
-    $token = $_POST['csrf_token'] ?? '';
-    if (!validateCSRFToken($token)) {
-        $error = 'Invalid CSRF token. Please refresh the page and try again.';
+    $exam_code = $_POST['exam_code'];
+    $student_fullname = trim($_POST['fullname']);
+    $student_index = trim($_POST['index_number']);
+    
+    // Validation
+    if (empty($student_fullname) || empty($student_index) || empty($exam_code)) {
+        $error = "All fields are required.";
+    } elseif (!preg_match('/^[A-Za-z\s\-\.\'\,]+$/', $student_fullname)) {
+        $error = "Full name can only contain letters, spaces, hyphens, periods, commas, and apostrophes.";
+    } elseif (!preg_match('/^[A-Za-z0-9\s\-\_]+$/', $student_index)) {
+        $error = "Index number can only contain letters, numbers, spaces, hyphens, and underscores.";
     } else {
-        $index_number = trim($_POST['index_number']);
-        $exam_code = trim($_POST['exam_code']);
-        $action = $_POST['action']; // 'start' or 'check_result'
-
-        // Registration fields
-        $full_name = trim($_POST['full_name'] ?? '');
-        $department = trim($_POST['department'] ?? '');
-        $program = trim($_POST['program'] ?? '');
-
-        if (!in_array($action, ['start', 'check_result'], true)) {
-            $error = "Invalid action.";
-        } elseif (empty($index_number) || empty($exam_code)) {
-            $error = "Course Code and Index Number are required.";
+        // Check if exam exists and is published
+        $stmt = $pdo->prepare("SELECT * FROM exams WHERE exam_code = ? AND is_published = 1");
+        $stmt->execute([$exam_code]);
+        $exam = $stmt->fetch();
+        
+        if (!$exam) {
+            $error = "Invalid exam code.";
         } else {
-            // Check if student exists
-            $stmt = $pdo->prepare("SELECT * FROM students WHERE index_number = ?");
-            $stmt->execute([$index_number]);
-            $student = $stmt->fetch();
-
-            if (!$student) {
-                // New Student: Check if registration details are submitted
-                if (empty($full_name) || empty($department) || empty($program)) {
-                    $show_registration = true; // Show the hidden fields
-                    $message = "First time login? Please complete your details to register.";
-                } else {
-                    // Register New Student
-                    $stmt = $pdo->prepare("INSERT INTO students (index_number, full_name, department, program) VALUES (?, ?, ?, ?)");
-                    $stmt->execute([$index_number, $full_name, $department, $program]);
-                    $student = ['index_number' => $index_number]; // Successfully registered
+            // Check if exam has started and not ended
+            $now = new DateTime();
+            if ($exam['start_datetime']) {
+                $start = new DateTime($exam['start_datetime']);
+                if ($now < $start) {
+                    $error = "This exam hasn't started yet.";
                 }
             }
-
-            // If student exists (or just registered), proceed to exam validation
-            if ($student && !$show_registration) {
-                // Validate Exam Code
-                $stmt = $pdo->prepare("SELECT id, title, is_published, start_datetime, end_datetime, attempts_allowed, duration FROM exams WHERE exam_code = ?");
-                $stmt->execute([$exam_code]);
-                $exam = $stmt->fetch();
-
-                if ($exam && $exam['is_published']) {
-                    // Check Attempts
-                    $stmt = $pdo->prepare("SELECT COUNT(*) as count, status, start_time FROM attempts WHERE exam_id = ? AND student_index = ? ORDER BY id DESC LIMIT 1");
-                    $stmt->execute([$exam['id'], $index_number]);
-                    $attempt_info = $stmt->fetch();
-                    $attempt_count = $attempt_info ? $attempt_info['count'] : 0;
-                    $last_status = $attempt_info ? $attempt_info['status'] : null;
-
-                    if ($action === 'check_result') {
-                        if ($attempt_count > 0 && ($last_status === 'completed')) {
-                            $_SESSION['student_index'] = $index_number;
-                            $_SESSION['exam_id'] = $exam['id'];
-                            session_regenerate_id(true);
-                            header("Location: student_result.php");
-                            exit;
-                        } else {
-                            $error = "You have not completed this exam yet.";
-                        }
-                    } elseif ($action === 'start') {
-                        // Check Schedule
-                        $now = new DateTime();
-                        $start = $exam['start_datetime'] ? new DateTime($exam['start_datetime']) : null;
-                        $end = $exam['end_datetime'] ? new DateTime($exam['end_datetime']) : null;
-                        
-                        if ($start && $now < $start) {
-                            $error = "Exam starts on " . $start->format('M d, Y h:i A');
-                        } elseif ($end && $now > $end) {
-                            $error = "Exam ended on " . $end->format('M d, Y h:i A');
-                        } else {
-                            // Check Attempts Limit
-                            $active_attempt = ($last_status === 'ongoing');
-                            
-                            if (!$active_attempt && $attempt_count >= $exam['attempts_allowed']) {
-                                $error = "You have already used all allowed attempts (" . $exam['attempts_allowed'] . "). Please check your results.";
-                            } else {
-                                // Start or Resume
-                                $_SESSION['student_index'] = $index_number;
-                                $_SESSION['exam_id'] = $exam['id'];
-                                session_regenerate_id(true);
-                                header("Location: take_exam.php");
-                                exit;
-                            }
-                        }
-                    }
-                } else {
-                    $error = "Invalid Course Code.";
+            
+            if ($exam['end_datetime']) {
+                $end = new DateTime($exam['end_datetime']);
+                if ($now > $end) {
+                    $error = "This exam has ended.";
                 }
+            }
+            
+            if (empty($error)) {
+                // Store student info in session
+                $_SESSION['student_fullname'] = $student_fullname;
+                $_SESSION['student_index'] = $student_index;
+                $_SESSION['exam_id'] = $exam['id'];
+                
+                // Redirect to exam
+                header("Location: take_exam.php");
+                exit;
             }
         }
     }
 }
+
 $csrf_token = generateCSRFToken();
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Student Portal</title>
+    <title>Student Login - Exam System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link href="theme.css" rel="stylesheet">
     <style>
         body {
-            background: var(--theme-bg);
-            color: var(--theme-text);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 2rem 1rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 1rem;
         }
-        .login-card {
-            max-width: 600px;
+        
+        .login-container {
             width: 100%;
-            padding: 30px;
-            border-radius: 15px;
-            box-shadow: 0 16px 35px rgba(15, 23, 42, 0.12);
-            background: var(--theme-card-bg);
-            border: 1px solid var(--theme-card-border);
+            max-width: 500px;
+            animation: fadeIn 0.6s ease;
+        }
+        
+        .login-card {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            overflow: hidden;
+        }
+        
+        .login-header {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            padding: 2.5rem 2rem;
+            text-align: center;
+            color: white;
+        }
+        
+        .login-icon {
+            width: 72px;
+            height: 72px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            font-size: 2rem;
+            backdrop-filter: blur(10px);
+        }
+        
+        .login-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        
+        .login-subtitle {
+            opacity: 0.9;
+            font-size: 0.9375rem;
+        }
+        
+        .login-body {
+            padding: 2rem;
+        }
+        
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+        
+        .form-label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 0.5rem;
+        }
+        
+        .input-wrapper {
             position: relative;
         }
-        .form-label {
+        
+        .form-input {
+            width: 100%;
+            padding: 0.875rem 1rem 0.875rem 2.75rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 0.9375rem;
+            transition: all 0.2s;
+            background: white;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #10b981;
+            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+        }
+        
+        .input-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9ca3af;
+            font-size: 1.125rem;
+        }
+        
+        .form-input:focus ~ .input-icon {
+            color: #10b981;
+        }
+        
+        .btn-login {
+            width: 100%;
+            padding: 1rem;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border: none;
+            border-radius: 12px;
+            color: white;
             font-weight: 600;
-            color: var(--theme-text);
-        }
-        .input-group-text {
-            background: var(--theme-input-bg);
-            color: var(--theme-muted);
-            border-color: var(--theme-input-border);
-        }
-        .registration-fields {
-            display: none;
-            background: var(--theme-table-stripe);
-            border: 1px solid var(--theme-card-border);
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-        }
-        .show-reg { display: block !important; animation: fadeIn 0.5s; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        body.theme-dark .login-card {
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
-        }
-        body.theme-dark .btn-close {
-            filter: invert(1) grayscale(100%);
-            opacity: 0.85;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 0.5rem;
         }
         
-        /* Mobile Responsive Styles */
-        @media (max-width: 768px) {
-            .login-card {
-                padding: 1.5rem;
-                margin: 1rem;
-            }
-            h3 {
-                font-size: 1.5rem;
-            }
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px -5px rgba(16, 185, 129, 0.4);
         }
         
-        @media (max-width: 480px) {
-            body {
-                padding: 1rem 0.5rem;
-            }
-            .login-card {
-                padding: 1.25rem;
-                border-radius: 12px;
-            }
-            h3 {
-                font-size: 1.25rem;
-            }
-            .input-group-text {
-                font-size: 0.75rem;
-            }
-            .btn-lg {
-                padding: 0.75rem 1rem;
-                font-size: 1rem;
-            }
+        .btn-login:active {
+            transform: translateY(0);
         }
         
-        /* Smart watch / Very small screens */
-        @media (max-width: 320px) {
-            .login-card {
-                padding: 1rem;
-            }
-            h3 {
-                font-size: 1.125rem;
-            }
-            .form-control-lg {
-                font-size: 1rem;
-                padding: 0.5rem 0.75rem;
-            }
-            .btn-lg {
-                padding: 0.5rem 0.75rem;
-                font-size: 0.875rem;
-            }
+        .alert {
+            border-radius: 12px;
+            border: none;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .alert-danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @media (max-width: 576px) {
+            body { padding: 0.5rem; }
+            .login-container { max-width: 100%; }
+            .login-card { border-radius: 20px; }
+            .login-header { padding: 2.5rem 1.5rem; }
+            .login-body { padding: 2rem 1.5rem; }
+            .login-icon { width: 72px; height: 72px; font-size: 1.75rem; }
+            .login-title { font-size: 1.75rem; }
+            .login-subtitle { font-size: 1rem; }
+            .form-input { padding: 1rem 1rem 1rem 3rem; font-size: 1rem; }
+            .input-icon { font-size: 1.25rem; }
+            .btn-login { padding: 1.125rem; font-size: 1.0625rem; }
+            .form-label { font-size: 0.9375rem; }
         }
     </style>
 </head>
 <body>
-    <div class="login-card">
-        <button type="button" class="btn-close position-absolute top-0 end-0 m-3" aria-label="Close" onclick="closeApp()"></button>
-        <h3 class="text-center mb-4">Student Exam Portal</h3>
-        
-        <?php if ($error): ?>
-            <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
-        <?php endif; ?>
-
-        <?php if ($message): ?>
-            <div class="alert alert-info"><?= htmlspecialchars($message) ?></div>
-        <?php endif; ?>
-        
-        <form method="POST">
-            <input type="hidden" name="csrf_token" value="<?= $csrf_token ?>">
-            <div class="mb-4">
-                 <label class="form-label">Course Code</label>
-                 <div class="input-group input-group-lg">
-                    <input type="text" name="exam_code" class="form-control" value="<?= htmlspecialchars($exam_code) ?>" placeholder="e.g. CS101" required>
-                    <span class="input-group-text text-muted fs-6 bg-light border-start-0">Provided by your lecturer</span>
-                 </div>
-            </div>
-
-            <div class="mb-4">
-                <label class="form-label">Index Number</label>
-                <input type="text" name="index_number" class="form-control form-control-lg" value="<?= htmlspecialchars($index_number) ?>" placeholder="Your Unique ID" required>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="login-icon">
+                    <i class="bi bi-pencil-square"></i>
+                </div>
+                <h1 class="login-title">Take Assessment</h1>
+                <p class="login-subtitle">Enter your details to start the exam</p>
             </div>
             
-            <!-- Registration Section: Hidden by default, shown if needed -->
-            <div class="registration-fields <?= $show_registration ? 'show-reg' : '' ?>">
-                <h5 class="mb-3 text-primary">New Student Registration</h5>
-                <p class="small text-muted">We don't recognize this Index Number. Please fill in your details to continue.</p>
+            <div class="login-body">
+                <?php if (isset($_GET['invalid'])): ?>
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-circle-fill"></i>
+                        Invalid exam code or access denied.
+                    </div>
+                <?php endif; ?>
+                <?php if (isset($error)): ?>
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-circle-fill"></i>
+                        <?= htmlspecialchars($error) ?>
+                    </div>
+                <?php endif; ?>
                 
-                <div class="mb-3">
-                    <label class="form-label">Full Name</label>
-                    <input type="text" name="full_name" class="form-control" value="<?= htmlspecialchars($full_name) ?>">
-                </div>
-
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">Department</label>
-                        <input type="text" name="department" class="form-control" value="<?= htmlspecialchars($department) ?>" placeholder="e.g. Computer Science">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?= $csrf_token ?>">
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="exam_code">Exam Code</label>
+                        <div class="input-wrapper">
+                            <i class="bi bi-key input-icon"></i>
+                            <input type="text" name="exam_code" id="exam_code" class="form-input" 
+                                   placeholder="Enter exam code" required maxlength="20" 
+                                   value="<?= htmlspecialchars($exam_code) ?>">
+                        </div>
                     </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">Program</label>
-                        <input type="text" name="program" class="form-control" value="<?= htmlspecialchars($program) ?>" placeholder="e.g. BSc IT">
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="fullname">Full Name</label>
+                        <div class="input-wrapper">
+                            <i class="bi bi-person input-icon"></i>
+                            <input type="text" name="fullname" id="fullname" class="form-input" 
+                                   placeholder="Enter your full name" required maxlength="100"
+                                   pattern="[A-Za-z\s\-\.\'\,]+" title="Letters, spaces, hyphens, periods, commas, and apostrophes only">
+                        </div>
                     </div>
-                </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="index_number">Index Number</label>
+                        <div class="input-wrapper">
+                            <i class="bi bi-card-text input-icon"></i>
+                            <input type="text" name="index_number" id="index_number" class="form-input" 
+                                   placeholder="Enter your index number" required maxlength="50"
+                                   pattern="[A-Za-z0-9\s\-\_]+" title="Letters, numbers, spaces, hyphens, and underscores only">
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn-login">
+                        <i class="bi bi-box-arrow-in-right me-2"></i>Start Assessment
+                    </button>
+                </form>
             </div>
-
-            <div class="d-grid gap-2 d-md-flex justify-content-md-center mt-4">
-                <button type="submit" name="action" value="start" class="btn btn-success btn-lg px-5">Take Exam</button>
-                <button type="submit" name="action" value="check_result" class="btn btn-outline-primary btn-lg px-5">Check Result</button>
-            </div>
-            
-            <div class="text-center mt-3 text-muted small">
-                Current Server Time: <?= date('M d, Y h:i A') ?>
-            </div>
-        </form>
+        </div>
     </div>
-    <script>
-        function closeApp() {
-            if(confirm('Are you sure you want to exit the Exam System?')) {
-                window.close();
-                // Fallback message if window.close() is blocked
-                setTimeout(function() {
-                    if (!window.closed) {
-                        alert("Browser security prevented automatic closing. Please close this tab manually.");
-                    }
-                }, 100);
-            }
-        }
-    </script>
+    
     <script defer src="theme.js"></script>
 </body>
 </html>
-

@@ -11,13 +11,12 @@ if (!isset($_GET['id'])) {
 $attempt_id = (int)$_GET['id'];
 
 // Fetch attempt + exam ownership
-$stmt = $pdo->prepare("
-    SELECT a.*, e.id AS exam_id, e.title AS exam_title, e.user_id, s.full_name, s.index_number
+$stmt = $pdo->prepare(
+    "SELECT a.*, a.student_fullname as full_name, a.student_index as index_number, e.id AS exam_id, e.title AS exam_title, e.user_id
     FROM attempts a
     JOIN exams e ON a.exam_id = e.id
-    LEFT JOIN students s ON a.student_index = s.index_number
-    WHERE a.id = ? AND e.user_id = ?
-");
+    WHERE a.id = ? AND e.user_id = ?"
+);
 $stmt->execute([$attempt_id, $_SESSION['user_id']]);
 $attempt = $stmt->fetch();
 

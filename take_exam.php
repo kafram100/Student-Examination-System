@@ -2,11 +2,12 @@
 require 'db.php';
 require 'auth.php';
 
-if (!isset($_SESSION['student_index']) || !isset($_SESSION['exam_id'])) {
+if (!isset($_SESSION['student_fullname']) || !isset($_SESSION['student_index']) || !isset($_SESSION['exam_id'])) {
     header("Location: student_login.php");
     exit;
 }
 
+$student_fullname = $_SESSION['student_fullname'];
 $student_index = $_SESSION['student_index'];
 $exam_id = $_SESSION['exam_id'];
 
@@ -61,8 +62,8 @@ if ($active_attempt) {
     }
 
     // 3. Start New Attempt
-    $stmt = $pdo->prepare("INSERT INTO attempts (exam_id, student_index, start_time) VALUES (?, ?, NOW())");
-    $stmt->execute([$exam_id, $student_index]);
+    $stmt = $pdo->prepare("INSERT INTO attempts (exam_id, student_index, student_fullname, start_time) VALUES (?, ?, ?, NOW())");
+    $stmt->execute([$exam_id, $student_index, $student_fullname]);
     
     // Fetch the newly created attempt
     $stmt = $pdo->prepare("SELECT * FROM attempts WHERE exam_id = ? AND student_index = ? AND status = 'ongoing'");

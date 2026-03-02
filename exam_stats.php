@@ -22,7 +22,7 @@ if (!$exam) {
 
 // Fetch Stats with Student Details
 $stmt = $pdo->prepare("
-    SELECT a.*, s.full_name, s.department, s.program,
+    SELECT a.*, a.student_fullname as full_name, a.student_index as index_number,
            (
                SELECT COUNT(*) FROM answers ax
                JOIN questions qx ON ax.question_id = qx.id
@@ -34,7 +34,6 @@ $stmt = $pdo->prepare("
                WHERE ax.attempt_id = a.id AND qx.q_type <> 'mcq' AND ax.marks_awarded IS NOT NULL
            ) AS manual_graded
     FROM attempts a 
-    LEFT JOIN students s ON a.student_index = s.index_number 
     WHERE a.exam_id = ? 
     ORDER BY a.score DESC
 ");

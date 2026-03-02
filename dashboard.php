@@ -388,8 +388,8 @@ $csrf_token = generateCSRFToken();
                 <a href="view_students.php" class="quick-action">
                     <i class="bi bi-people-fill"></i>
                     <div>
-                        <div class="fw-semibold">View Students</div>
-                        <small class="text-muted">See all registered students</small>
+                        <div class="fw-semibold">Student Results</div>
+                        <small class="text-muted">View results from exam attempts</small>
                     </div>
                 </a>
             </div>
