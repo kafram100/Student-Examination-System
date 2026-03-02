@@ -453,8 +453,154 @@ body {
   box-shadow: var(--shadow-lg);
   border-left: 4px solid var(--primary);
   padding: 1rem 1.25rem;
+  color: var(--text-primary);
 }
 
 .toast-modern.success { border-left-color: var(--success); }
 .toast-modern.error { border-left-color: var(--danger); }
 .toast-modern.warning { border-left-color: var(--warning); }
+
+/* Dark mode enhancements for modern theme */
+body.theme-dark .toast-modern {
+  background: var(--gray-800);
+  color: var(--text-primary);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+}
+
+body.theme-dark .toast-modern.success { border-left-color: var(--success); }
+body.theme-dark .toast-modern.error { border-left-color: var(--danger); }
+body.theme-dark .toast-modern.warning { border-left-color: var(--warning); }
+
+/* Dark mode enhancements for tables */
+body.theme-dark .table-modern {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+body.theme-dark .table-modern thead {
+  background: linear-gradient(135deg, var(--gray-700) 0%, var(--gray-800) 100%);
+  color: var(--text-primary);
+}
+
+body.theme-dark .table-modern th {
+  color: var(--text-primary);
+  border-bottom-color: var(--gray-200);
+}
+
+body.theme-dark .table-modern td {
+  color: var(--text-primary);
+  border-bottom-color: var(--gray-100);
+}
+
+body.theme-dark .table-modern tbody tr:hover {
+  background: var(--gray-700);
+}
+
+/* Dark mode enhancements for cards */
+body.theme-dark .card-modern {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+body.theme-dark .card-header-modern {
+  background: linear-gradient(135deg, var(--gray-700) 0%, var(--gray-800) 100%);
+  border-bottom-color: var(--gray-200);
+  color: var(--text-primary);
+}
+
+/* Dark mode enhancements for stats cards */
+body.theme-dark .stat-card {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+body.theme-dark .stat-card:hover {
+  background: var(--bg-secondary);
+}
+
+/* Dark mode enhancements for auth card */
+body.theme-dark .auth-card {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* Dark mode enhancements for form controls */
+body.theme-dark .form-control-modern {
+  background: var(--bg-tertiary);
+  border-color: var(--gray-200);
+  color: var(--text-primary);
+}
+
+body.theme-dark .form-control-modern:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
+}
+
+/* Dark mode enhancements for buttons */
+body.theme-dark .btn-outline-modern {
+  background: transparent;
+  border: 2px solid var(--gray-200);
+  color: var(--text-primary);
+}
+
+body.theme-dark .btn-outline-modern:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: rgba(99, 102, 241, 0.15);
+}
+
+/* Dark mode enhancements for badges */
+body.theme-dark .badge-published {
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--success);
+}
+
+body.theme-dark .badge-draft {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--warning);
+}
+
+body.theme-dark .badge-released {
+  background: rgba(59, 130, 246, 0.2);
+  color: var(--info);
+}
+
+/* Dark mode enhancements for empty states */
+body.theme-dark .empty-state {
+  background: var(--bg-tertiary);
+  border-color: var(--gray-200);
+  color: var(--text-primary);
+}
+
+/* Dark mode enhancements for page header */
+body.theme-dark .page-title {
+  color: var(--text-primary);
+}
+
+body.theme-dark .page-subtitle {
+  color: var(--text-secondary);
+}
+
+/* Dark mode enhancements for navbar */
+body.theme-dark .navbar-modern {
+  background: linear-gradient(135deg, var(--gray-800) 0%, var(--gray-900) 100%);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+body.theme-dark .navbar-brand {
+  color: var(--text-primary) !important;
+}
+
+body.theme-dark .navbar-text {
+  color: var(--text-secondary) !important;
+}
+
+body.theme-dark .navbar-modern .btn-outline-light {
+  color: var(--text-primary);
+  border-color: var(--gray-200);
+}
+
+body.theme-dark .navbar-modern .btn-outline-light:hover {
+  background: rgba(99, 102, 241, 0.2);
+  color: var(--primary);
+}

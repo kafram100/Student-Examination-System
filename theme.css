@@ -39,13 +39,13 @@
 
 body.theme-dark {
     --theme-bg: #0f172a;
-    --theme-text: #f1f5f9;
+    --theme-text: #e2e8f0;
     --theme-card-bg: #1e293b;
     --theme-card-border: #334155;
     --theme-muted: #94a3b8;
     --theme-link: #818cf8;
-    --theme-input-bg: #0f172a;
-    --theme-input-border: #334155;
+    --theme-input-bg: #1e293b;
+    --theme-input-border: #475569;
     --theme-table-stripe: #1e293b;
     --theme-primary: #818cf8;
     --theme-primary-light: #a5b4fc;
@@ -235,8 +235,8 @@ small,
     top: 16px;
     right: 16px;
     z-index: 2000;
-    width: 44px;
-    height: 44px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     border: 1px solid var(--theme-card-border);
     background: linear-gradient(135deg, var(--theme-primary) 0%, var(--theme-primary-light) 100%);
@@ -244,7 +244,30 @@ small,
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    animation: float 3s ease-in-out infinite;
+}
+
+.theme-toggle-fab:hover {
+    transform: scale(1.1) rotate(10deg);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+
+@keyframes float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-5px); }
+    100% { transform: translateY(0px); }
+}
+
+body.theme-dark .theme-toggle-fab {
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+body.theme-dark .theme-toggle-fab:hover {
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
 }
 
 .theme-toggle-fab svg {
@@ -255,6 +278,54 @@ small,
 .theme-toggle-fab:focus-visible {
     outline: 2px solid var(--theme-link);
     outline-offset: 3px;
+}
+
+/* Enhanced dark mode styles */
+body.theme-dark {
+    /* Enhanced scrollbar for dark mode */
+    scrollbar-color: #475569 #1e293b;
+}
+
+body.theme-dark ::-webkit-scrollbar {
+    width: 12px;
+}
+
+body.theme-dark ::-webkit-scrollbar-track {
+    background: #1e293b;
+}
+
+body.theme-dark ::-webkit-scrollbar-thumb {
+    background-color: #475569;
+    border-radius: 6px;
+    border: 3px solid #1e293b;
+}
+
+/* Better contrast for buttons in dark mode */
+body.theme-dark .btn-outline-secondary,
+body.theme-dark .btn-outline-light {
+    color: var(--text-primary);
+    border-color: var(--theme-input-border);
+    background-color: rgba(30, 41, 59, 0.5);
+}
+
+body.theme-dark .btn-outline-secondary:hover,
+body.theme-dark .btn-outline-light:hover {
+    background-color: var(--theme-input-bg);
+    color: var(--theme-primary);
+}
+
+/* Improve contrast for disabled elements */
+body.theme-dark .disabled,
+body.theme-dark [disabled] {
+    opacity: 0.6;
+    color: var(--text-muted);
+}
+
+/* Better contrast for form controls */
+body.theme-dark .form-control:disabled,
+body.theme-dark .form-control[readonly] {
+    background-color: #1e293b;
+    color: var(--text-muted);
 }
 
 @media (max-width: 576px) {

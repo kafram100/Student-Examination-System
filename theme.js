@@ -8,6 +8,10 @@
 
         document.body.classList.toggle(DARK_CLASS, isDark);
         document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+        
+        // Also set a cookie for server-side detection if needed
+        document.cookie = `theme=${isDark ? 'dark' : 'light'}; path=/; max-age=31536000`; // 1 year
+        
         const toggle = document.getElementById('themeToggleFab');
         const sun = document.getElementById('themeSunIcon');
         const moon = document.getElementById('themeMoonIcon');
@@ -56,8 +60,19 @@
     }
 
     function initThemeToggle() {
+        // Check for saved theme preference or system preference
+        let savedTheme = localStorage.getItem(THEME_KEY);
+        
+        // If no saved preference, check for cookie
+        if (!savedTheme) {
+            const cookieTheme = document.cookie.split('; ').find(row => row.startsWith('theme='));
+            if (cookieTheme) {
+                savedTheme = cookieTheme.split('=')[1];
+            }
+        }
+        
         createToggleButton();
-        applyTheme(localStorage.getItem(THEME_KEY));
+        applyTheme(savedTheme);
     }
 
     if (document.readyState === 'loading') {
