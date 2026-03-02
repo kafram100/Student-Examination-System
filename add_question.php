@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $marks = (int)$_POST['marks'];
     
     // Validate question type
-    $valid_types = ['mcq', 'theory', 'file'];
+    $valid_types = ['mcq', 'theory', 'file', 'fill_in'];
     if (!in_array($q_type, $valid_types)) {
         $error = "Invalid question type.";
     } elseif ($marks < 1 && !$use_csv) {
@@ -225,6 +225,7 @@ $csrf_token = generateCSRFToken();
                                     <select name="q_type" id="q_type" class="form-select" onchange="toggleQuestionType()" required>
                                         <option value="mcq">Multiple Choice (MCQ)</option>
                                         <option value="theory">Theory/Short Answer</option>
+                                        <option value="fill_in">Fill-in-the-Blank</option>
                                         <option value="file">File Upload (Student uploads a file)</option>
                                     </select>
                                 </div>
@@ -323,6 +324,15 @@ $csrf_token = generateCSRFToken();
                 filePrompt.style.display = 'none';
                 fileInput.required = false;
                 csvWrap.style.display = 'block';
+                marksInput.required = true;
+            } else if (type === 'fill_in') {
+                mcqOptions.style.display = 'none';
+                mcqInputs.forEach(input => input.required = false);
+                csvWrap.style.display = 'none';
+                questionTextWrap.style.display = 'block';
+                questionText.required = true;
+                filePrompt.style.display = 'none';
+                fileInput.required = false;
                 marksInput.required = true;
             } else {
                 mcqOptions.style.display = 'none';

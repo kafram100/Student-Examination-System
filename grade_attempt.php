@@ -176,6 +176,8 @@ $csrf_token = generateCSRFToken();
                             Selected: <strong><?= htmlspecialchars($ans['selected_option'] ?? '-') ?></strong> |
                             Correct: <strong><?= htmlspecialchars($ans['correct_option']) ?></strong>
                         </div>
+                    <?php elseif ($ans['q_type'] === 'fill_in'): ?>
+                        <div class="answer-value">Student Answer: <?= htmlspecialchars($ans['theory_answer'] ?? '—') ?></div>
                     <?php elseif ($ans['q_type'] === 'theory'): ?>
                         <div class="answer-value"><?= htmlspecialchars($ans['theory_answer'] ?? '—') ?></div>
                     <?php elseif ($ans['q_type'] === 'file'): ?>

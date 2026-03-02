@@ -467,6 +467,14 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
                         queueSave({ questionId: qid, type: 'file', file });
                     });
                 });
+
+                // Handle fill-in questions
+                document.querySelectorAll('input[type="text"][data-answer-type="fill_in"]').forEach((input) => {
+                    input.addEventListener('input', (event) => {
+                        const qid = event.target.getAttribute('data-question-id');
+                        debounceSave(qid, { questionId: qid, type: 'fill_in', value: event.target.value });
+                    });
+                });
             }
 
             function syncDraftOnReconnect() {
@@ -587,6 +595,9 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
                                         <label class="form-check-label" for="q<?= $q['id'] ?>E">E) <?= htmlspecialchars($q['option_e']) ?></label>
                                     </div>
                                 <?php endif; ?>
+
+                            <?php elseif ($q['q_type'] === 'fill_in'): ?>
+                                <input type="text" name="fill_in_answers[<?= $q['id'] ?>]" class="form-control" placeholder="Type your answer here..." value="<?= htmlspecialchars($saved['theory_answer'] ?? '') ?>" data-question-id="<?= $q['id'] ?>" data-answer-type="fill_in">
 
                             <?php elseif ($q['q_type'] === 'theory'): ?>
                                 <textarea name="theory_answers[<?= $q['id'] ?>]" class="form-control" rows="4" placeholder="Type your answer here..." data-question-id="<?= $q['id'] ?>" data-answer-type="theory"><?= htmlspecialchars($saved['theory_answer'] ?? '') ?></textarea>

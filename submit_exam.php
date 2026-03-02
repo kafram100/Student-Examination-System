@@ -75,6 +75,7 @@ if (!$attempt) {
 $attempt_id = $attempt['id'];
 $answers_input = isset($_POST['answers']) ? $_POST['answers'] : [];
 $theory_answers = isset($_POST['theory_answers']) ? $_POST['theory_answers'] : [];
+$fill_in_answers = isset($_POST['fill_in_answers']) ? $_POST['fill_in_answers'] : [];
 $is_auto_submit = !empty($_POST['auto_submit']);
 $has_payload = !empty($answers_input) || !empty($theory_answers);
 if (!$has_payload && !empty($_FILES)) {
@@ -127,6 +128,15 @@ foreach ($questions as $q) {
         $is_correct = ($selected === $q['correct_option']) ? 1 : 0;
         if ($is_correct) {
             $total_score += $q['marks'];
+        }
+    } elseif ($q_type === 'fill_in') {
+        if ($use_existing && $existing) {
+            $theory_ans = $existing['theory_answer'];
+        } else {
+            $theory_ans = isset($fill_in_answers[$qid]) ? trim($fill_in_answers[$qid]) : null;
+        }
+        if ($theory_ans === '') {
+            $theory_ans = null;
         }
     } elseif ($q_type === 'theory') {
         if ($use_existing && $existing) {

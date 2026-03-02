@@ -27,12 +27,13 @@ CREATE TABLE IF NOT EXISTS questions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     exam_id INT NOT NULL,
     question_text TEXT NOT NULL,
-    option_a VARCHAR(255) NOT NULL,
-    option_b VARCHAR(255) NOT NULL,
-    option_c VARCHAR(255) NOT NULL,
-    option_d VARCHAR(255) NOT NULL,
-    option_e VARCHAR(255),
-    correct_option CHAR(1) NOT NULL, -- 'A', 'B', 'C', 'D', 'E'
+    q_type ENUM('mcq', 'theory', 'file', 'fill_in') NOT NULL DEFAULT 'mcq',
+    option_a TEXT,
+    option_b TEXT,
+    option_c TEXT,
+    option_d TEXT,
+    option_e TEXT,
+    correct_option CHAR(1),
     marks INT DEFAULT 1,
     FOREIGN KEY (exam_id) REFERENCES exams(id) ON DELETE CASCADE
 );
@@ -54,6 +55,8 @@ CREATE TABLE IF NOT EXISTS answers (
     attempt_id INT NOT NULL,
     question_id INT NOT NULL,
     selected_option CHAR(1),
+    theory_answer TEXT,
+    file_upload VARCHAR(255),
     is_correct BOOLEAN,
     FOREIGN KEY (attempt_id) REFERENCES attempts(id) ON DELETE CASCADE,
     FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE

@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update'])) {
     $marks = (int)$_POST['marks'];
     
     // Validate question type
-    $valid_types = ['mcq', 'theory', 'file'];
+    $valid_types = ['mcq', 'theory', 'file', 'fill_in'];
     if (!in_array($q_type, $valid_types)) {
         $error = "Invalid question type.";
     } elseif ($marks < 1) {
@@ -220,6 +220,7 @@ $csrf_token = generateCSRFToken();
                                     <select name="q_type" id="q_type" class="form-select" onchange="toggleQuestionType()" required>
                                         <option value="mcq" <?= $question['q_type'] === 'mcq' ? 'selected' : '' ?>>Multiple Choice (MCQ)</option>
                                         <option value="theory" <?= $question['q_type'] === 'theory' ? 'selected' : '' ?>>Theory/Short Answer</option>
+                                        <option value="fill_in" <?= $question['q_type'] === 'fill_in' ? 'selected' : '' ?>>Fill-in-the-Blank</option>
                                         <option value="file" <?= $question['q_type'] === 'file' ? 'selected' : '' ?>>File Upload</option>
                                     </select>
                                 </div>
@@ -309,6 +310,13 @@ $csrf_token = generateCSRFToken();
                 document.getElementById('option_a').required = true;
                 document.getElementById('option_b').required = true;
                 document.getElementById('correct_option').required = true;
+                questionTextWrap.style.display = 'block';
+                questionText.required = true;
+                filePrompt.style.display = 'none';
+                fileInput.required = false;
+            } else if (type === 'fill_in') {
+                mcqOptions.style.display = 'none';
+                mcqInputs.forEach(input => input.required = false);
                 questionTextWrap.style.display = 'block';
                 questionText.required = true;
                 filePrompt.style.display = 'none';
