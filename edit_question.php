@@ -45,7 +45,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update'])) {
     $option_c = isset($_POST['option_c']) ? sanitizeInput($_POST['option_c']) : null;
     $option_d = isset($_POST['option_d']) ? sanitizeInput($_POST['option_d']) : null;
     $option_e = isset($_POST['option_e']) ? sanitizeInput($_POST['option_e']) : null;
-    $correct_option = ($q_type === 'mcq') ? sanitizeInput($_POST['correct_option']) : null;
+    $correct_option = null;
+    
+    if ($q_type === 'mcq') {
+        $correct_option = sanitizeInput($_POST['correct_option']);
+    } elseif ($q_type === 'fill_in' && isset($_POST['fill_in_correct_answer'])) {
+        // For fill-in questions, store the correct answer in the correct_option field
+        $correct_option = sanitizeInput($_POST['fill_in_correct_answer']);
+    }
+    
     $marks = (int)$_POST['marks'];
     
     // Validate question type
@@ -58,6 +66,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update'])) {
         $error = "Please fill in all required fields for MCQ.";
     } elseif ($q_type === 'mcq' && !in_array($correct_option, ['A', 'B', 'C', 'D', 'E'])) {
         $error = "Invalid correct option.";
+    } elseif ($q_type === 'fill_in' && empty($correct_option)) {
+        $error = "Please enter the correct answer for the fill-in question.";
     } elseif ($q_type !== 'file' && empty($question_text)) {
         $error = "Question text is required.";
     } else {
@@ -283,7 +293,16 @@ $csrf_token = generateCSRFToken();
                                     </div>
                                 </div>
                             </div>
-
+                                                        
+                            <!-- Fill-in-the-Blank Correct Answer Section -->
+                            <div id="fill-in-correct-answer" style="display:none;">
+                                <div class="mb-3">
+                                    <label>Correct Answer (Hidden from Students) *</label>
+                                    <input type="text" name="fill_in_correct_answer" id="fill_in_correct_answer" class="form-control" placeholder="Enter the correct answer" value="<?= htmlspecialchars($question['correct_option'] ?? '') ?>">
+                                    <small class="text-muted">This answer will be used to grade student responses but won't be visible to students during the exam.</small>
+                                </div>
+                            </div>
+                                                        
                             <div class="d-grid gap-2">
                                 <button type="submit" name="update" class="btn btn-primary">Update Question</button>
                                 <button type="submit" name="delete" class="btn btn-danger" onclick="return confirm('Are you sure you want to DELETE this question? This action cannot be undone!');">Delete Question</button>
@@ -304,6 +323,8 @@ $csrf_token = generateCSRFToken();
             const questionText = document.getElementById('question_text');
             const filePrompt = document.getElementById('file-prompt');
             const fileInput = document.getElementById('question_file');
+            const fillInAnswerSection = document.getElementById('fill-in-correct-answer');
+            const fillInAnswerInput = document.getElementById('fill_in_correct_answer');
 
             if (type === 'mcq') {
                 mcqOptions.style.display = 'block';
@@ -314,6 +335,8 @@ $csrf_token = generateCSRFToken();
                 questionText.required = true;
                 filePrompt.style.display = 'none';
                 fileInput.required = false;
+                fillInAnswerSection.style.display = 'none';
+                fillInAnswerInput.required = false;
             } else if (type === 'fill_in') {
                 mcqOptions.style.display = 'none';
                 mcqInputs.forEach(input => input.required = false);
@@ -321,6 +344,8 @@ $csrf_token = generateCSRFToken();
                 questionText.required = true;
                 filePrompt.style.display = 'none';
                 fileInput.required = false;
+                fillInAnswerSection.style.display = 'block';
+                fillInAnswerInput.required = true;
             } else {
                 mcqOptions.style.display = 'none';
                 mcqInputs.forEach(input => input.required = false);
@@ -329,11 +354,15 @@ $csrf_token = generateCSRFToken();
                     questionText.required = false;
                     filePrompt.style.display = 'block';
                     fileInput.required = (fileInput.getAttribute('data-has-file') !== '1');
+                    fillInAnswerSection.style.display = 'none';
+                    fillInAnswerInput.required = false;
                 } else {
                     questionTextWrap.style.display = 'block';
                     questionText.required = true;
                     filePrompt.style.display = 'none';
                     fileInput.required = false;
+                    fillInAnswerSection.style.display = 'none';
+                    fillInAnswerInput.required = false;
                 }
             }
         }

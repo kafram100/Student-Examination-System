@@ -176,7 +176,10 @@ $csrf_token = generateCSRFToken();
                             Correct: <strong><?= htmlspecialchars($ans['correct_option']) ?></strong>
                         </div>
                     <?php elseif ($ans['q_type'] === 'fill_in'): ?>
-                        <div class="answer-value">Student Answer: <?= htmlspecialchars($ans['theory_answer'] ?? '—') ?></div>
+                        <div class="answer-value">
+                            Student Answer: <?= htmlspecialchars($ans['theory_answer'] ?? '—') ?><br>
+                            Correct Answer: <strong><?= htmlspecialchars($ans['correct_option']) ?></strong>
+                        </div>
                     <?php elseif ($ans['q_type'] === 'theory'): ?>
                         <div class="answer-value"><?= htmlspecialchars($ans['theory_answer'] ?? '—') ?></div>
                     <?php elseif ($ans['q_type'] === 'file'): ?>

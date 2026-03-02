@@ -138,6 +138,14 @@ foreach ($questions as $q) {
         if ($theory_ans === '') {
             $theory_ans = null;
         }
+        // Compare student's answer with correct answer for fill-in questions
+        if ($theory_ans !== null && $q['correct_option'] !== null) {
+            // Case insensitive comparison, trim whitespace
+            if (strtolower(trim($theory_ans)) === strtolower(trim($q['correct_option']))) {
+                $is_correct = 1;
+                $total_score += $q['marks'];
+            }
+        }
     } elseif ($q_type === 'theory') {
         if ($use_existing && $existing) {
             $theory_ans = $existing['theory_answer'];
