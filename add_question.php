@@ -428,7 +428,7 @@ $csrf_token = generateCSRFToken();
                     return;
                 }
                 
-                // Validate MCQ fields
+                // Validate fields based on question type
                 const qType = document.getElementById('q_type').value;
                 if (qType === 'mcq') {
                     const optionA = document.getElementById('option_a').value.trim();
@@ -440,9 +440,23 @@ $csrf_token = generateCSRFToken();
                         e.preventDefault();
                         return;
                     }
+                } else if (qType === 'fill_in') {
+                    const fillInAnswer = document.getElementById('fill_in_correct_answer')?.value.trim();
+                    
+                    if (!fillInAnswer) {
+                        alert('Please enter the correct answer for the fill-in question.');
+                        e.preventDefault();
+                        return;
+                    }
                 }
                 
-                // Prevent default submission
+                // Check if online - if so, submit normally
+                if (navigator.onLine) {
+                    // Allow normal form submission
+                    return;
+                }
+                
+                // Offline mode - use offline sync
                 e.preventDefault();
                 
                 const submitBtn = form.querySelector('button[type="submit"]');
@@ -466,18 +480,11 @@ $csrf_token = generateCSRFToken();
                     if (typeof syncManager !== 'undefined') {
                         syncManager.updatePendingCount(pendingCount);
                         
-                        if (syncManager.isOnline) {
-                            syncManager.showNotification('Question saved and syncing...', 'success');
-                            await syncManager.sync();
-                            setTimeout(() => {
-                                window.location.href = 'view_exam.php?id=' + examId + '&synced=1';
-                            }, 1000);
-                        } else {
-                            syncManager.showNotification('Question saved locally. Will sync when online.', 'warning');
-                            setTimeout(() => {
-                                window.location.href = 'view_exam.php?id=' + examId + '&offline=1';
-                            }, 1500);
-                        }
+                        syncManager.showNotification('Question saved offline. Will sync when online.', 'info');
+                        // Redirect after a delay
+                        setTimeout(() => {
+                            window.location.href = 'view_exam.php?id=' + examId;
+                        }, 1500);
                     } else {
                         alert('Question saved locally. Will sync when online.');
                         window.location.href = 'view_exam.php?id=' + examId + '&offline=1';
