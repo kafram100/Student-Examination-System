@@ -152,6 +152,12 @@ if (!$attempt || $attempt['status'] != 'completed') {
             <p>You have successfully submitted your exam.</p>
         <?php endif; ?>
         
+        <?php if (!empty($attempt['notes'])): ?>
+            <div class="alert alert-info mt-3">
+                <strong>Note:</strong> <?= htmlspecialchars($attempt['notes']) ?>
+            </div>
+        <?php endif; ?>
+        
         <a href="student_login.php" class="btn btn-outline-primary mt-3">Home</a>
     </div>
     <script defer src="theme.js"></script>

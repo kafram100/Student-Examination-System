@@ -188,6 +188,12 @@ foreach ($questions as $q) {
 $stmt = $pdo->prepare("UPDATE attempts SET score = ?, total_marks = ?, submit_time = NOW(), status = 'completed' WHERE id = ?");
 $stmt->execute([$total_score, $total_marks, $attempt_id]);
 
+// If this was an auto-submit, add a note
+if (isset($_POST['auto_submit'])) {
+    $stmt = $pdo->prepare("UPDATE attempts SET notes = CONCAT(COALESCE(notes, ''), ' Auto-submitted due to time expiration.') WHERE id = ?");
+    $stmt->execute([$attempt_id]);
+}
+
 // Redirect
 header("Location: student_result.php");
 exit;

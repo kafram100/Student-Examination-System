@@ -210,11 +210,59 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             document.getElementById('timer').innerText = minutes + "m " + seconds + "s";
             
             if (timeLeft <= 0) {
-                document.getElementById('examForm').submit();
+                // Ensure all answers are saved before auto-submitting
+                saveAllAnswers();
+                // Small delay to allow autosave to complete
+                setTimeout(() => {
+                    document.getElementById('examForm').submit();
+                }, 500);
             } else {
                 timeLeft--;
                 setTimeout(updateTimer, 1000);
             }
+        }
+        
+        // Function to manually save all answers
+        function saveAllAnswers() {
+            // Trigger all pending autosaves
+            if (typeof processAllQueues !== 'undefined') {
+                processAllQueues();
+            }
+            
+            // Manually trigger input events to queue any unsaved changes
+            document.querySelectorAll('input[type="text"][data-answer-type="fill_in"], textarea[data-answer-type="theory"]').forEach(input => {
+                if (input.value !== input.dataset.lastSavedValue) {
+                    input.dispatchEvent(new Event('input'));
+                    input.dataset.lastSavedValue = input.value;
+                }
+            });
+            
+            // For radio buttons and checkboxes
+            document.querySelectorAll('input[type="radio"][data-answer-type="mcq"]').forEach(input => {
+                if (input.checked && !input.dataset.lastSavedChecked) {
+                    input.dispatchEvent(new Event('change'));
+                    input.dataset.lastSavedChecked = true;
+                }
+            });
+        }
+        
+        // Helper function to process all pending queues
+        function processAllQueues() {
+            // Get all question IDs
+            const questionIds = [];
+            document.querySelectorAll('[data-question-id]').forEach(el => {
+                const qid = el.getAttribute('data-question-id');
+                if (qid && !questionIds.includes(qid)) {
+                    questionIds.push(qid);
+                }
+            });
+            
+            // Process queue for each question
+            questionIds.forEach(qid => {
+                if (typeof processQueue === 'function') {
+                    processQueue(parseInt(qid));
+                }
+            });
         }
         
         // Show proctoring modal on load if required

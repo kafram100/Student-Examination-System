@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS attempts (
     score DECIMAL(10, 2) DEFAULT 0,
     total_marks INT DEFAULT 0,
     status ENUM('ongoing', 'completed') DEFAULT 'ongoing',
+    notes TEXT,
     FOREIGN KEY (exam_id) REFERENCES exams(id) ON DELETE CASCADE
 );
 
