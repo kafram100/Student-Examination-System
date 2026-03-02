@@ -132,7 +132,49 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         .autosave-status.is-saving .autosave-dot { background: #0d6efd; }
         .autosave-status.is-offline .autosave-dot { background: #dc3545; }
         .autosave-status.is-saved .autosave-dot { background: #198754; }
+        
+        /* Proctoring overlay styles */
+        .proctoring-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        
+        .proctoring-modal {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            max-width: 500px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        
+        .proctoring-video-preview {
+            width: 100%;
+            max-width: 320px;
+            margin: 1rem auto;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .security-notice {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 1rem;
+            margin: 1rem 0;
+            text-align: left;
+        }
     </style>
+    <script src="js/proctoring.js"></script>
     <script>
         let timeLeft = <?= $remaining_sec ?>;
         let isUnlimited = <?= $is_unlimited ? 'true' : 'false' ?>;
@@ -152,10 +194,63 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             }
         }
         
+        // Show proctoring modal on load
         window.addEventListener('load', () => {
-            updateTimer();
-            initAutosave();
+            // Show the proctoring modal
+            document.getElementById('proctoringModal').style.display = 'flex';
+            
+            // Request camera and mic access
+            initializeProctoring();
+            
+            // Set up the start button
+            document.getElementById('start-proctoring-btn').addEventListener('click', startExamWithProctoring);
         });
+        
+        async function initializeProctoring() {
+            try {
+                // Request camera and microphone access
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 640 }, height: { ideal: 480 } },
+                    audio: true
+                });
+                
+                // Display video preview
+                const videoPreview = document.getElementById('proctoring-video-preview');
+                videoPreview.srcObject = stream;
+                videoPreview.style.display = 'block';
+                
+                // Enable start button
+                document.getElementById('start-proctoring-btn').disabled = false;
+                document.getElementById('camera-permission-status').innerHTML = '<span class="text-success">Camera and microphone access granted</span>';
+                
+                // Store stream for later use
+                window.proctoringStream = stream;
+                
+            } catch (err) {
+                console.error('Error accessing media devices:', err);
+                document.getElementById('camera-permission-status').innerHTML = '<span class="text-danger">Camera/microphone access denied. Exam cannot start.</span>';
+                
+                // Still allow exam to start but log the security issue
+                document.getElementById('start-proctoring-btn').disabled = false;
+                document.getElementById('start-proctoring-btn').textContent = 'Continue Without Proctoring';
+            }
+        }
+        
+        function startExamWithProctoring() {
+            // Hide the proctoring modal
+            document.getElementById('proctoringModal').style.display = 'none';
+            
+            // Start the proctoring system
+            if (window.examProctoring) {
+                window.examProctoring.startExam();
+            }
+            
+            // Initialize autosave
+            initAutosave();
+            
+            // Start the timer
+            updateTimer();
+        }
 
         function initAutosave() {
             const autosaveStatus = document.getElementById('autosave-status');
@@ -379,6 +474,30 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
     </script>
 </head>
 <body>
+    <!-- Proctoring Modal -->
+    <div id="proctoringModal" class="proctoring-overlay" style="display: none;">
+        <div class="proctoring-modal">
+            <h3><i class="bi bi-shield-lock me-2"></i>Exam Security Verification</h3>
+            <p>Please allow camera and microphone access to begin your proctored exam.</p>
+            
+            <div class="security-notice">
+                <h5><i class="bi bi-exclamation-triangle me-2"></i>Security Notice:</h5>
+                <ul class="mb-0" style="text-align: left;">
+                    <li>Your video and audio will be recorded during this exam</li>
+                    <li>Any suspicious activity will be flagged</li>
+                    <li>Do not switch tabs or close this window</li>
+                    <li>Ensure you are in a quiet, well-lit environment</li>
+                </ul>
+            </div>
+            
+            <video id="proctoring-video-preview" class="proctoring-video-preview" autoplay muted></video>
+            <div id="camera-permission-status">Camera access required</div>
+            
+            <div class="mt-3">
+                <button id="start-proctoring-btn" class="btn btn-success btn-lg" disabled>Start Proctored Exam</button>
+            </div>
+        </div>
+    </div>
     <?php if (!$is_unlimited): ?>
         <div class="timer-bar">
             Time Remaining: <span id="timer"></span>

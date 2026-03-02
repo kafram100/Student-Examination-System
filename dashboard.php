@@ -403,6 +403,15 @@ $csrf_token = generateCSRFToken();
                 </a>
             </div>
             <div class="col-md-4">
+                <a href="proctoring_monitor.php" class="quick-action">
+                    <i class="bi bi-camera-video-fill" style="background: var(--danger);"></i>
+                    <div>
+                        <div class="fw-semibold">Proctoring Monitor</div>
+                        <small class="text-muted">Monitor exam sessions in real-time</small>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-4">
                 <div class="quick-action" style="cursor: default;">
                     <i class="bi bi-bar-chart-fill" style="background: var(--success);"></i>
                     <div>
