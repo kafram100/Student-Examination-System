@@ -19,9 +19,6 @@ class ExamProctoring {
             return;
         }
 
-        // Request camera and microphone access
-        this.requestMediaAccess();
-
         // Set up event listeners for security measures
         this.setupSecurityListeners();
     }
@@ -337,6 +334,10 @@ class ExamProctoring {
     }
 
     showViolationOverlay(message) {
+        // Hide the exam content immediately to prevent reading during violation
+        const contentArea = document.getElementById('exam-content-area');
+        if (contentArea) contentArea.style.display = 'none';
+
         // Prevent multiple overlays
         if (document.getElementById('proctoring-violation-overlay')) return;
 
@@ -382,6 +383,12 @@ class ExamProctoring {
         document.getElementById('btn-return-exam').addEventListener('click', () => {
             overlay.remove();
             this.enterFullscreen(); // Always force fullscreen after a violation
+
+            // Show content only when we are sure
+            setTimeout(() => {
+                const contentArea = document.getElementById('exam-content-area');
+                if (contentArea) contentArea.style.display = 'block';
+            }, 500);
         });
     }
 
@@ -471,12 +478,15 @@ class ExamProctoring {
             }
 
             // Check if we're still in fullscreen
-            if (!document.fullscreenElement) {
-                this.logSuspiciousActivity('exit_fullscreen', 'Student exited fullscreen mode');
-                this.sendSecurityAlert('Student exited fullscreen mode');
+            if (!document.fullscreenElement && !document.mozFullScreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {
+                // Ignore if violation overlay is already up
+                if (!document.getElementById('proctoring-violation-overlay')) {
+                    this.logSuspiciousActivity('exit_fullscreen', 'Student exited fullscreen mode');
+                    this.sendSecurityAlert('Student exited fullscreen mode');
 
-                // Re-enter fullscreen
-                this.enterFullscreen();
+                    // Immediately show violation to force a user click to re-enter fullscreen
+                    this.showViolationOverlay('You exited fullscreen view. Exams must be taken in fullscreen mode to ensure integrity.');
+                }
             }
         }, 1000);
     }

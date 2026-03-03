@@ -16,14 +16,8 @@ $stmt = $pdo->prepare("SELECT * FROM exams WHERE id = ?");
 $stmt->execute([$exam_id]);
 $exam = $stmt->fetch();
 
-// Check if proctoring is required for this exam type
-$requires_proctoring = false;
-if (isset($exam['exam_type'])) {
-    $exam_type = strtolower($exam['exam_type']);
-    if (strpos($exam_type, 'examination') !== false || strpos($exam_type, 'mid-semester') !== false || strpos($exam_type, 'mid semester') !== false) {
-        $requires_proctoring = true;
-    }
-}
+// Require proctoring for all exams
+$requires_proctoring = true;
 
 // If proctoring is required but not enabled, redirect
 if ($requires_proctoring && !isset($_SESSION['proctoring_enabled'])) {
@@ -405,9 +399,17 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         function startExamWithProctoring() {
             // Hide the proctoring modal
             document.getElementById('proctoringModal').style.display = 'none';
+            // Show the exam content
+            document.getElementById('exam-content-area').style.display = 'block';
             
             // Start the proctoring system
             if (window.examProctoring) {
+                if (window.proctoringStream) {
+                    window.examProctoring.videoStream = window.proctoringStream;
+                    window.examProctoring.startRecording();
+                    window.examProctoring.connectMonitoringServer();
+                    window.examProctoring.enforceStreamActivity();
+                }
                 window.examProctoring.startExam();
             }
             
@@ -672,13 +674,14 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             </div>
         </div>
     </div>
-    <?php if (!$is_unlimited): ?>
-        <div class="timer-bar">
-            Time Remaining: <span id="timer"></span>
-        </div>
-    <?php endif; ?>
+    <div id="exam-content-area" style="display: none;">
+        <?php if (!$is_unlimited): ?>
+            <div class="timer-bar">
+                Time Remaining: <span id="timer"></span>
+            </div>
+        <?php endif; ?>
 
-    <div class="container content" style="<?= $is_unlimited ? 'margin-top: 20px;' : '' ?>">
+        <div class="container content" style="<?= $is_unlimited ? 'margin-top: 20px;' : '' ?>">
         <h2 class="mb-4"><?= htmlspecialchars($exam['title']) ?></h2>
         <p class="lead"><?= nl2br(htmlspecialchars($exam['instructions'])) ?></p>
         <div class="autosave-status mb-3" id="autosave-status">
@@ -762,7 +765,8 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
                 <button type="submit" class="btn btn-primary btn-lg px-5 shadow-sm mb-5">Submit My Work</button>
             </div>
         </form>
-    </div>
+    </div> <!-- container -->
+    </div> <!-- exam-content-area -->
     <script defer src="theme.js"></script>
 </body>
 </html>

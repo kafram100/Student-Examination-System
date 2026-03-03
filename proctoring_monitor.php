@@ -22,7 +22,7 @@ $stmt = $pdo->prepare("
         esp.suspicious_activity_count,
         esp.proctoring_status,
         esp.video_recording_path,
-        COALESCE(u.username, a.student_fullname) as student_username,
+        CONCAT(a.student_fullname, ' - ', a.student_index) as student_username,
         e.title as exam_title
     FROM exam_sessions_proctoring esp
     JOIN attempts a ON esp.exam_attempt_id = a.id
@@ -39,7 +39,7 @@ $active_sessions = $stmt->fetchAll();
 $stmt = $pdo->prepare("
     SELECT 
         esl.*,
-        COALESCE(u.username, a.student_fullname) as student_username,
+        CONCAT(a.student_fullname, ' - ', a.student_index) as student_username,
         e.title as exam_title
     FROM exam_security_logs esl
     JOIN attempts a ON esl.exam_attempt_id = a.id
