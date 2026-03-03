@@ -33,9 +33,9 @@ $exam_reports = $reports_stmt->fetchAll();
 
 // Build query for activity logs
 $activity_query = "
-    SELECT eal.*, u.username as student_username, e.title as exam_title, a.student_index
+    SELECT eal.*, COALESCE(u.username, a.student_fullname) as student_username, e.title as exam_title, a.student_index
     FROM exam_activity_logs eal
-    JOIN users u ON eal.user_id = u.id
+    LEFT JOIN users u ON eal.user_id = u.id
     JOIN attempts a ON eal.exam_attempt_id = a.id
     JOIN exams e ON a.exam_id = e.id
     WHERE e.user_id = ?
@@ -72,9 +72,9 @@ $activity_logs = $activity_stmt->fetchAll();
 
 // Build query for cheating incidents
 $incidents_query = "
-    SELECT ci.*, u.username as student_username, e.title as exam_title, a.student_index
+    SELECT ci.*, COALESCE(u.username, a.student_fullname) as student_username, e.title as exam_title, a.student_index
     FROM cheating_incidents ci
-    JOIN users u ON ci.user_id = u.id
+    LEFT JOIN users u ON ci.user_id = u.id
     JOIN attempts a ON ci.exam_attempt_id = a.id
     JOIN exams e ON a.exam_id = e.id
     WHERE e.user_id = ?
@@ -124,28 +124,31 @@ $csrf_token = generateCSRFToken();
             border-left: 3px solid var(--gray-300);
             margin-bottom: 0.5rem;
             border-radius: 0 4px 4px 0;
+            background: transparent;
         }
         
         .activity-item.low { border-left-color: var(--success); }
         .activity-item.medium { border-left-color: var(--warning); }
         .activity-item.high { border-left-color: var(--info); }
-        .activity-item.critical { border-left-color: var(--danger); background-color: rgba(220, 38, 38, 0.05); }
+        .activity-item.critical { border-left-color: var(--danger); background-color: var(--danger-light); }
         
         .incident-card {
             border: 1px solid var(--gray-200);
             border-radius: var(--radius-lg);
             padding: 1.25rem;
             margin-bottom: 1rem;
+            background: #ffffff;
+            color: #1e293b;
         }
         
         .incident-card.confirmed {
             border-left: 4px solid var(--danger);
-            background-color: rgba(239, 68, 68, 0.05);
+            background-color: var(--danger-light);
         }
         
         .incident-card.dismissed {
             border-left: 4px solid var(--success);
-            background-color: rgba(16, 185, 129, 0.05);
+            background-color: var(--success-light);
         }
         
         .severity-badge {
@@ -155,16 +158,98 @@ $csrf_token = generateCSRFToken();
             font-weight: 600;
         }
         
-        .severity-low { background-color: rgba(16, 185, 129, 0.15); color: var(--success); }
-        .severity-medium { background-color: rgba(245, 158, 11, 0.15); color: var(--warning); }
-        .severity-high { background-color: rgba(59, 130, 246, 0.15); color: var(--info); }
-        .severity-critical { background-color: rgba(239, 68, 68, 0.15); color: var(--danger); }
+        .severity-low { background-color: var(--success-light); color: var(--success); }
+        .severity-medium { background-color: var(--warning-light); color: var(--warning); }
+        .severity-high { background-color: var(--info-light); color: var(--info); }
+        .severity-critical { background-color: var(--danger-light); color: var(--danger); }
         
         .filter-section {
-            background: var(--bg-tertiary);
-            border-radius: var(--radius-md);
-            padding: 1rem;
-            margin-bottom: 1.5rem;
+            background: #ffffff;
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-200);
+            color: #1e293b;
+        }
+        
+        .card-modern {
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-200);
+            overflow: hidden;
+            margin-bottom: 1.5rem !important;
+            color: #1e293b;
+        }
+        
+        .card-header-modern {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--gray-200);
+            background: transparent;
+            color: #1e293b;
+        }
+        
+        .card-body {
+            padding: 1.5rem;
+        }
+
+        /* Strict Dark Mode Overrides */
+        body.theme-dark {
+            background: #0f172a !important;
+            color: #f1f5f9 !important;
+        }
+        
+        body.theme-dark .navbar-modern {
+            background: #1e293b !important;
+            border-bottom: 1px solid #334155 !important;
+        }
+
+        body.theme-dark .navbar-brand,
+        body.theme-dark .navbar-text,
+        body.theme-dark .page-title,
+        body.theme-dark .page-subtitle {
+            color: #f1f5f9 !important;
+            -webkit-text-fill-color: #f1f5f9 !important;
+            background: none !important;
+        }
+
+        body.theme-dark .card-modern,
+        body.theme-dark .incident-card,
+        body.theme-dark .filter-section {
+            background: #1e293b !important;
+            border-color: #334155 !important;
+            color: #f1f5f9 !important;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2) !important;
+        }
+
+        body.theme-dark .card-header-modern {
+            background: transparent !important;
+            border-bottom-color: #334155 !important;
+            color: #f1f5f9 !important;
+        }
+        
+        body.theme-dark .text-muted {
+            color: #94a3b8 !important;
+        }
+        
+        body.theme-dark .border-top {
+            border-top-color: #334155 !important;
+        }
+
+        body.theme-dark .activity-item {
+            border-left-color: #475569 !important;
+        }
+        
+        body.theme-dark .btn-outline-secondary,
+        body.theme-dark .btn-outline-light {
+            color: #f1f5f9 !important;
+            border-color: #475569 !important;
+        }
+        
+        body.theme-dark .btn-outline-secondary:hover,
+        body.theme-dark .btn-outline-light:hover {
+            background: #334155 !important;
         }
     </style>
 </head>
@@ -191,10 +276,15 @@ $csrf_token = generateCSRFToken();
 
     <div class="container py-4">
         <!-- Page Header -->
-        <div class="page-header d-flex justify-content-between align-items-start mb-4">
-            <div>
-                <h1 class="page-title">Exam Activity Reports</h1>
-                <p class="page-subtitle">Monitor student activities and detect potential cheating</p>
+        <div class="page-header mb-4 mt-2">
+            <a href="dashboard.php" class="btn btn-sm btn-outline-secondary mb-3">
+                <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
+            </a>
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h1 class="page-title h3 fw-bold mb-1">Exam Activity Reports</h1>
+                    <p class="page-subtitle text-muted mb-0">Monitor student activities and detect potential cheating</p>
+                </div>
             </div>
         </div>
 
@@ -240,9 +330,9 @@ $csrf_token = generateCSRFToken();
                     <input type="date" name="end_date" id="end_date" class="form-control" value="<?= $end_date ?>">
                 </div>
                 
-                <div class="col-12">
-                    <button type="submit" class="btn btn-primary">Apply Filters</button>
-                    <a href="exam_activity_report.php" class="btn btn-outline-secondary">Reset</a>
+                <div class="col-12 mt-4 pt-3 border-top">
+                    <button type="submit" class="btn btn-primary px-4"><i class="bi bi-funnel me-2"></i>Apply Filters</button>
+                    <a href="exam_activity_report.php" class="btn btn-outline-secondary px-4 ms-2">Reset</a>
                 </div>
             </form>
         </div>
@@ -413,5 +503,6 @@ $csrf_token = generateCSRFToken();
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script defer src="theme.js"></script>
 </body>
 </html>

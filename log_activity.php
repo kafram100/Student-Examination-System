@@ -3,7 +3,11 @@ require_once 'db.php';
 require_once 'auth.php';
 
 // Only allow authenticated users to log activities
-requireLogin();
+if (!isset($_SESSION['user_id']) && !isset($_SESSION['student_index'])) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Unauthorized']);
+    exit;
+}
 
 // Check if request method is POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -37,13 +41,20 @@ try {
     }
     
     // Check if this activity belongs to the current user
-    $stmt = $pdo->prepare("
-        SELECT ea.id 
-        FROM exam_attempts ea 
-        JOIN exams e ON ea.exam_id = e.id 
-        WHERE ea.id = ? AND (ea.user_id = ? OR e.user_id = ?)
-    ");
-    $stmt->execute([$exam_attempt_id, $_SESSION['user_id'], $_SESSION['user_id']]);
+    if (isset($_SESSION['student_index'])) {
+        $stmt = $pdo->prepare("SELECT id FROM attempts WHERE id = ? AND student_index = ?");
+        $stmt->execute([$exam_attempt_id, $_SESSION['student_index']]);
+        $user_id = 0;
+    } else {
+        $stmt = $pdo->prepare("
+            SELECT ea.id 
+            FROM attempts ea 
+            JOIN exams e ON ea.exam_id = e.id 
+            WHERE ea.id = ? AND e.user_id = ?
+        ");
+        $stmt->execute([$exam_attempt_id, $_SESSION['user_id']]);
+        $user_id = $_SESSION['user_id'];
+    }
     
     if (!$stmt->rowCount()) {
         throw new Exception('Unauthorized access to exam attempt');
@@ -58,7 +69,7 @@ try {
     
     $result = $stmt->execute([
         $exam_attempt_id,
-        $_SESSION['user_id'],
+        $user_id,
         $input['type'],
         $input['description'],
         $input['timestamp'],

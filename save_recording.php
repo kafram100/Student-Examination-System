@@ -3,7 +3,11 @@ require_once 'db.php';
 require_once 'auth.php';
 
 // Only allow authenticated users to save recordings
-requireLogin();
+if (!isset($_SESSION['user_id']) && !isset($_SESSION['student_index'])) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Unauthorized']);
+    exit;
+}
 
 // Check if request method is POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -27,13 +31,20 @@ try {
     }
 
     // Check if this recording belongs to the current user
-    $stmt = $pdo->prepare("
-        SELECT ea.id 
-        FROM exam_attempts ea 
-        JOIN exams e ON ea.exam_id = e.id 
-        WHERE ea.id = ? AND (ea.user_id = ? OR e.user_id = ?)
-    ");
-    $stmt->execute([$exam_attempt_id, $_SESSION['user_id'], $_SESSION['user_id']]);
+    if (isset($_SESSION['student_index'])) {
+        $stmt = $pdo->prepare("SELECT id FROM attempts WHERE id = ? AND student_index = ?");
+        $stmt->execute([$exam_attempt_id, $_SESSION['student_index']]);
+        $user_id = 0;
+    } else {
+        $stmt = $pdo->prepare("
+            SELECT ea.id 
+            FROM attempts ea 
+            JOIN exams e ON ea.exam_id = e.id 
+            WHERE ea.id = ? AND e.user_id = ?
+        ");
+        $stmt->execute([$exam_attempt_id, $_SESSION['user_id']]);
+        $user_id = $_SESSION['user_id'];
+    }
     
     if (!$stmt->rowCount()) {
         throw new Exception('Unauthorized access to exam attempt');
@@ -75,19 +86,16 @@ try {
             throw new Exception('Failed to save recording file');
         }
         
-        // Save recording info to database
+        // Update existing recording info in database
         $stmt = $pdo->prepare("
-            INSERT INTO exam_sessions_proctoring 
-            (exam_attempt_id, student_id, lecturer_id, video_recording_path, start_time) 
-            VALUES (?, ?, ?, ?, NOW())
+            UPDATE exam_sessions_proctoring 
+            SET video_recording_path = ?
+            WHERE exam_attempt_id = ?
         ");
         
         $result = $stmt->execute([
-            $exam_attempt_id,
-            $_SESSION['user_id'],
-            // Get lecturer ID from exam
-            getLecturerIdFromExam($exam_attempt_id, $pdo),
-            $filepath
+            $filepath,
+            $exam_attempt_id
         ]);
         
         if ($result) {
@@ -112,7 +120,7 @@ try {
 function getLecturerIdFromExam($exam_attempt_id, $pdo) {
     $stmt = $pdo->prepare("
         SELECT e.user_id 
-        FROM exam_attempts ea 
+        FROM attempts ea 
         JOIN exams e ON ea.exam_id = e.id 
         WHERE ea.id = ?
     ");

@@ -34,6 +34,7 @@ if (!$attempt || $attempt['status'] != 'completed') {
     <meta charset="UTF-8">
     <title>Exam Results</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link href="theme.css" rel="stylesheet">
     <style>
         body {
@@ -131,29 +132,37 @@ if (!$attempt || $attempt['status'] != 'completed') {
         <h3><?= htmlspecialchars($exam['title']) ?></h3>
         <p class="text-muted"><?= htmlspecialchars($student['full_name'] ?? 'N/A') ?> (<?= htmlspecialchars($student_index) ?>)</p>
         
+        <?php if (!isset($_GET['view']) || $_GET['view'] !== 'results'): ?>
+            <div class="mt-4 mb-4">
+                <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
+                <h2 class="mt-3 text-success">Exam Submitted Successfully!</h2>
+                <p class="lead mt-3">Your responses have been recorded.</p>
+            </div>
+        <?php endif; ?>
+
         <?php if ($exam['results_released']): ?>
-            <div class="mt-4">
+            <div class="mt-4 p-4 border rounded bg-light">
+                <h4 class="mb-3 text-primary"><i class="bi bi-bar-chart-fill me-2"></i>Your Results</h4>
                 <h1><?= (int)$attempt['score'] ?> / <?= (int)$attempt['total_marks'] ?></h1>
-                <p class="lead">Your Score</p>
+                <p class="lead">Final Score</p>
                 <?php 
                     $percentage = ($attempt['total_marks'] > 0) ? ($attempt['score'] / $attempt['total_marks']) * 100 : 0;
                 ?>
                 <div class="progress mb-3">
                     <div class="progress-bar <?= $percentage >= 50 ? 'bg-success' : 'bg-danger' ?>" role="progressbar" style="width: <?= $percentage ?>%"></div>
                 </div>
-                <p><?= round($percentage, 2) ?>%</p>
+                <p class="mb-0 fw-bold"><?= round($percentage, 2) ?>%</p>
             </div>
         <?php else: ?>
-            <div class="alert alert-warning mt-4">
-                <h4>Results Not Yet Released</h4>
-                <p>Please check back later or contact your lecturer.</p>
+            <div class="alert alert-info mt-4" style="background-color: rgba(13, 110, 253, 0.1); border: 1px solid rgba(13, 110, 253, 0.2);">
+                <h5 class="alert-heading mb-2"><i class="bi bi-info-circle me-2"></i>Results Pending</h5>
+                <p class="mb-0">Please revisit this page to check your results after the lecturer has released them.</p>
             </div>
-            <p>You have successfully submitted your exam.</p>
         <?php endif; ?>
         
         <?php if (!empty($attempt['notes'])): ?>
-            <div class="alert alert-info mt-3">
-                <strong>Note:</strong> <?= htmlspecialchars($attempt['notes']) ?>
+            <div class="alert alert-warning mt-3">
+                <strong><i class="bi bi-exclamation-triangle me-1"></i> Note:</strong> <?= htmlspecialchars($attempt['notes']) ?>
             </div>
         <?php endif; ?>
         

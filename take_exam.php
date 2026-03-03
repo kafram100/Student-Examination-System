@@ -173,11 +173,16 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         
         .proctoring-modal {
             background: white;
+            color: #212529; /* Explicit dark text */
             padding: 2rem;
             border-radius: 10px;
             max-width: 500px;
             text-align: center;
             box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        
+        .proctoring-modal h3, .proctoring-modal p, .proctoring-modal div {
+            color: #212529;
         }
         
         .proctoring-video-preview {
@@ -192,10 +197,15 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         .security-notice {
             background: #fff3cd;
             border: 1px solid #ffeaa7;
+            color: #856404; /* Explicit warning text color */
             border-radius: 5px;
             padding: 1rem;
             margin: 1rem 0;
             text-align: left;
+        }
+        
+        .security-notice h5, .security-notice li {
+            color: #856404 !important;
         }
     </style>
     <script src="js/proctoring.js"></script>

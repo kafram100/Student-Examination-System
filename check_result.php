@@ -11,14 +11,11 @@ $exam_code = $_GET['exam_code'] ?? '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     checkCSRF();
     $exam_code = $_POST['exam_code'];
-    $student_fullname = trim($_POST['fullname']);
     $student_index = trim($_POST['index_number']);
     
     // Validation
-    if (empty($student_fullname) || empty($student_index) || empty($exam_code)) {
+    if (empty($student_index) || empty($exam_code)) {
         $error = "All fields are required.";
-    } elseif (!preg_match('/^[A-Za-z\s\-\.\'\,]+$/', $student_fullname)) {
-        $error = "Full name can only contain letters, spaces, hyphens, periods, commas, and apostrophes.";
     } elseif (!preg_match('/^[A-Za-z0-9\s\-\_]+$/', $student_index)) {
         $error = "Index number can only contain letters, numbers, spaces, hyphens, and underscores.";
     } else {
@@ -30,30 +27,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$exam) {
             $error = "Invalid exam code.";
         } else {
-            // Check if exam has started and not ended
-            $now = new DateTime();
-            if ($exam['start_datetime']) {
-                $start = new DateTime($exam['start_datetime']);
-                if ($now < $start) {
-                    $error = "This exam hasn't started yet.";
-                }
-            }
+            // Check if attempt exists for this index
+            $stmt = $pdo->prepare("SELECT * FROM attempts WHERE exam_id = ? AND student_index = ? ORDER BY id DESC LIMIT 1");
+            $stmt->execute([$exam['id'], $student_index]);
+            $attempt = $stmt->fetch();
             
-            if ($exam['end_datetime']) {
-                $end = new DateTime($exam['end_datetime']);
-                if ($now > $end) {
-                    $error = "This exam has ended.";
-                }
-            }
-            
-            if (empty($error)) {
+            if (!$attempt || $attempt['status'] != 'completed') {
+                $error = "No completed exam found for this index number.";
+            } else {
                 // Store student info in session
-                $_SESSION['student_fullname'] = $student_fullname;
+                $_SESSION['student_fullname'] = $attempt['student_fullname'] ?? 'Student';
                 $_SESSION['student_index'] = $student_index;
                 $_SESSION['exam_id'] = $exam['id'];
                 
-                // Redirect to exam
-                header("Location: take_exam.php");
+                // Redirect to results
+                header("Location: student_result.php?view=results");
                 exit;
             }
         }
@@ -67,7 +55,7 @@ $csrf_token = generateCSRFToken();
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Student Login - Exam System</title>
+    <title>Check Results - Exam System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
@@ -79,7 +67,7 @@ $csrf_token = generateCSRFToken();
             display: flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
             padding: 1rem;
         }
         
@@ -97,7 +85,7 @@ $csrf_token = generateCSRFToken();
         }
         
         .login-header {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
             padding: 2.5rem 2rem;
             text-align: center;
             color: white;
@@ -159,8 +147,8 @@ $csrf_token = generateCSRFToken();
         
         .form-input:focus {
             outline: none;
-            border-color: #10b981;
-            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
         }
         
         .input-icon {
@@ -173,13 +161,13 @@ $csrf_token = generateCSRFToken();
         }
         
         .form-input:focus ~ .input-icon {
-            color: #10b981;
+            color: #3b82f6;
         }
         
         .btn-login {
             width: 100%;
             padding: 1rem;
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
             border: none;
             border-radius: 12px;
             color: white;
@@ -192,11 +180,35 @@ $csrf_token = generateCSRFToken();
         
         .btn-login:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 20px -5px rgba(16, 185, 129, 0.4);
+            box-shadow: 0 10px 20px -5px rgba(59, 130, 246, 0.4);
         }
         
         .btn-login:active {
             transform: translateY(0);
+        }
+        
+        .btn-outline {
+            width: 100%;
+            padding: 1rem;
+            background: transparent;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            color: #4b5563;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+        }
+        
+        .btn-outline:hover {
+            border-color: #d1d5db;
+            background: #f9fafb;
+            color: #1f2937;
         }
         
         .alert {
@@ -230,7 +242,7 @@ $csrf_token = generateCSRFToken();
             .login-subtitle { font-size: 1rem; }
             .form-input { padding: 1rem 1rem 1rem 3rem; font-size: 1rem; }
             .input-icon { font-size: 1.25rem; }
-            .btn-login { padding: 1.125rem; font-size: 1.0625rem; }
+            .btn-login, .btn-outline { padding: 1.125rem; font-size: 1.0625rem; }
             .form-label { font-size: 0.9375rem; }
         }
     </style>
@@ -240,19 +252,13 @@ $csrf_token = generateCSRFToken();
         <div class="login-card">
             <div class="login-header">
                 <div class="login-icon">
-                    <i class="bi bi-pencil-square"></i>
+                    <i class="bi bi-search"></i>
                 </div>
-                <h1 class="login-title">Take Assessment</h1>
-                <p class="login-subtitle">Enter your details to start the exam</p>
+                <h1 class="login-title">Check Results</h1>
+                <p class="login-subtitle">Enter your details to view your scores</p>
             </div>
             
             <div class="login-body">
-                <?php if (isset($_GET['invalid'])): ?>
-                    <div class="alert alert-danger">
-                        <i class="bi bi-exclamation-circle-fill"></i>
-                        Invalid exam code or access denied.
-                    </div>
-                <?php endif; ?>
                 <?php if (isset($error)): ?>
                     <div class="alert alert-danger">
                         <i class="bi bi-exclamation-circle-fill"></i>
@@ -274,16 +280,6 @@ $csrf_token = generateCSRFToken();
                     </div>
                     
                     <div class="form-group">
-                        <label class="form-label" for="fullname">Full Name</label>
-                        <div class="input-wrapper">
-                            <i class="bi bi-person input-icon"></i>
-                            <input type="text" name="fullname" id="fullname" class="form-input" 
-                                   placeholder="Enter your full name" required maxlength="100"
-                                   pattern="[A-Za-z\s\-\.\'\,]+" title="Letters, spaces, hyphens, periods, commas, and apostrophes only">
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
                         <label class="form-label" for="index_number">Index Number</label>
                         <div class="input-wrapper">
                             <i class="bi bi-card-text input-icon"></i>
@@ -294,17 +290,13 @@ $csrf_token = generateCSRFToken();
                     </div>
                     
                     <button type="submit" class="btn-login">
-                        <i class="bi bi-box-arrow-in-right me-2"></i>Start Assessment
-                    </button>
-                </form>
-
-                <div class="mt-4 text-center">
-                    <hr class="mb-4" style="opacity: 0.15;">
-                    <p class="text-muted mb-3" style="font-size: 0.875rem;">Want to check your score from a previous exam?</p>
-                    <a href="check_result.php<?= !empty($exam_code) ? '?exam_code=' . urlencode($exam_code) : '' ?>" class="btn btn-outline-success border-2 w-100" style="padding: 0.875rem; border-radius: 12px; font-weight: 600;">
                         <i class="bi bi-clipboard-data me-2"></i>Check Results
+                    </button>
+                    
+                    <a href="student_login.php" class="btn-outline">
+                        <i class="bi bi-arrow-left me-2"></i>Back to Exam Login
                     </a>
-                </div>
+                </form>
             </div>
         </div>
     </div>

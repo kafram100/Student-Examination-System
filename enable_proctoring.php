@@ -2,8 +2,12 @@
 require_once 'db.php';
 require_once 'auth.php';
 
-// Only allow authenticated users
-requireLogin();
+// Allow students or authenticated staff
+if (!isset($_SESSION['user_id']) && !isset($_SESSION['student_index'])) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    exit;
+}
 
 // Only allow POST requests
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -26,9 +30,9 @@ try {
     // Get exam attempt ID
     $exam_attempt_id = $_SESSION['exam_attempt_id'] ?? null;
     $exam_id = $_SESSION['exam_id'] ?? null;
-    $student_id = $_SESSION['user_id'] ?? null;
+    $student_id = $_SESSION['user_id'] ?? 0;
     
-    if ($exam_attempt_id && $exam_id && $student_id) {
+    if ($exam_attempt_id && $exam_id && $student_id !== null) {
         // Fetch exam details to get the lecturer ID
         $stmt = $pdo->prepare("SELECT user_id FROM exams WHERE id = ?");
         $stmt->execute([$exam_id]);

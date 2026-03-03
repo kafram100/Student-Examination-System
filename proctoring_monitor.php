@@ -21,11 +21,12 @@ $stmt = $pdo->prepare("
         esp.start_time,
         esp.suspicious_activity_count,
         esp.proctoring_status,
-        u.username as student_username,
+        esp.video_recording_path,
+        COALESCE(u.username, a.student_fullname) as student_username,
         e.title as exam_title
     FROM exam_sessions_proctoring esp
-    JOIN users u ON esp.student_id = u.id
     JOIN attempts a ON esp.exam_attempt_id = a.id
+    LEFT JOIN users u ON esp.student_id = u.id
     JOIN exams e ON a.exam_id = e.id
     WHERE e.user_id = ?
     AND esp.proctoring_status IN ('active', 'flagged')
@@ -38,11 +39,11 @@ $active_sessions = $stmt->fetchAll();
 $stmt = $pdo->prepare("
     SELECT 
         esl.*,
-        u.username as student_username,
+        COALESCE(u.username, a.student_fullname) as student_username,
         e.title as exam_title
     FROM exam_security_logs esl
     JOIN attempts a ON esl.exam_attempt_id = a.id
-    JOIN users u ON esl.user_id = u.id
+    LEFT JOIN users u ON esl.user_id = u.id
     JOIN exams e ON a.exam_id = e.id
     WHERE e.user_id = ?
     ORDER BY esl.timestamp DESC
@@ -72,6 +73,8 @@ $csrf_token = generateCSRFToken();
             padding: 1.25rem;
             margin-bottom: 1rem;
             transition: all var(--transition-fast);
+            background: #ffffff;
+            color: #1e293b;
         }
         
         .session-card.flagged {
@@ -138,6 +141,85 @@ $csrf_token = generateCSRFToken();
         .status-active { background-color: rgba(16, 185, 129, 0.15); color: var(--success); }
         .status-flagged { background-color: rgba(245, 158, 11, 0.15); color: var(--warning); }
         .status-violated { background-color: rgba(239, 68, 68, 0.15); color: var(--danger); }
+
+        .card-modern {
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-200);
+            overflow: hidden;
+            margin-bottom: 1.5rem !important;
+            color: #1e293b;
+        }
+        
+        .card-header-modern {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--gray-200);
+            background: transparent;
+            color: #1e293b;
+        }
+        
+        .card-body {
+            padding: 1.5rem;
+        }
+
+        /* Strict Dark Mode Overrides */
+        body.theme-dark {
+            background: #0f172a !important;
+            color: #f1f5f9 !important;
+        }
+        
+        body.theme-dark .navbar-modern {
+            background: #1e293b !important;
+            border-bottom: 1px solid #334155 !important;
+        }
+
+        body.theme-dark .navbar-brand,
+        body.theme-dark .navbar-text,
+        body.theme-dark .page-title,
+        body.theme-dark .page-subtitle {
+            color: #f1f5f9 !important;
+            -webkit-text-fill-color: #f1f5f9 !important;
+            background: none !important;
+        }
+
+        body.theme-dark .card-modern,
+        body.theme-dark .session-card,
+        body.theme-dark .empty-state {
+            background: #1e293b !important;
+            border-color: #334155 !important;
+            color: #f1f5f9 !important;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2) !important;
+        }
+
+        body.theme-dark .card-header-modern {
+            background: transparent !important;
+            border-bottom-color: #334155 !important;
+            color: #f1f5f9 !important;
+        }
+        
+        body.theme-dark .text-muted {
+            color: #94a3b8 !important;
+        }
+        
+        body.theme-dark .border-top {
+            border-top-color: #334155 !important;
+        }
+
+        body.theme-dark .security-log-item {
+            border-left-color: #475569 !important;
+        }
+        
+        body.theme-dark .btn-outline-secondary,
+        body.theme-dark .btn-outline-light {
+            color: #f1f5f9 !important;
+            border-color: #475569 !important;
+        }
+        
+        body.theme-dark .btn-outline-secondary:hover,
+        body.theme-dark .btn-outline-light:hover {
+            background: #334155 !important;
+        }
     </style>
 </head>
 <body>
@@ -163,10 +245,15 @@ $csrf_token = generateCSRFToken();
 
     <div class="container py-4">
         <!-- Page Header -->
-        <div class="page-header d-flex justify-content-between align-items-start mb-4">
-            <div>
-                <h1 class="page-title">Proctoring Monitor</h1>
-                <p class="page-subtitle">Monitor active exam sessions and security events</p>
+        <div class="page-header mb-4 mt-2">
+            <a href="dashboard.php" class="btn btn-sm btn-outline-secondary mb-3">
+                <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
+            </a>
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h1 class="page-title h3 fw-bold mb-1">Proctoring Monitor</h1>
+                    <p class="page-subtitle text-muted mb-0">Monitor active exam sessions and security events</p>
+                </div>
             </div>
         </div>
 
@@ -220,7 +307,7 @@ $csrf_token = generateCSRFToken();
                                             </div>
                                             
                                             <div class="d-flex gap-2 mt-3">
-                                                <button class="btn btn-sm btn-primary flex-fill">
+                                                <button class="btn btn-sm btn-primary flex-fill" onclick="viewVideo('<?= htmlspecialchars(basename($session['video_recording_path'] ?? '')) ?>', '<?= htmlspecialchars($session['student_username'], ENT_QUOTES) ?>')">
                                                     <i class="bi bi-eye me-1"></i>View
                                                 </button>
                                                 <button class="btn btn-sm btn-outline-danger flex-fill">
@@ -289,11 +376,72 @@ $csrf_token = generateCSRFToken();
         </div>
     </div>
 
+    <!-- Video Modal -->
+    <div class="modal fade" id="videoModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content card-modern">
+                <div class="modal-header card-header-modern">
+                    <h5 class="modal-title"><i class="bi bi-camera-video me-2"></i>Video Record: <span id="modalStudentName"></span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center p-0" style="background: #000; position: relative;">
+                    <video id="proctoringVideoPlayer" controls style="width: 100%; max-height: 70vh;">
+                        Your browser does not support the video tag.
+                    </video>
+                    <div id="noVideoMessage" class="p-5 d-none d-flex flex-column align-items-center justify-content-center" style="height: 400px; background: var(--bs-body-bg);">
+                        <i class="bi bi-camera-video-off display-1 text-muted mb-3"></i>
+                        <h4 style="color: var(--bs-body-color);">No Video Available</h4>
+                        <p class="text-muted">The video recording for this session is not available yet or could not be loaded.</p>
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top: 1px solid var(--gray-200);">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        let videoModal;
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            videoModal = new bootstrap.Modal(document.getElementById('videoModal'));
+            
+            // Stop video when modal is closed
+            document.getElementById('videoModal').addEventListener('hidden.bs.modal', function () {
+                const videoPlayer = document.getElementById('proctoringVideoPlayer');
+                videoPlayer.pause();
+                videoPlayer.src = '';
+            });
+        });
+
+        function viewVideo(videoFileName, studentName) {
+            document.getElementById('modalStudentName').textContent = studentName;
+            const videoPlayer = document.getElementById('proctoringVideoPlayer');
+            const noVideoMessage = document.getElementById('noVideoMessage');
+            
+            if (videoFileName) {
+                videoPlayer.src = 'uploads/proctoring/' + videoFileName;
+                videoPlayer.classList.remove('d-none');
+                noVideoMessage.classList.add('d-none');
+                videoPlayer.play().catch(e => console.log("Auto-play prevented", e));
+            } else {
+                videoPlayer.src = '';
+                videoPlayer.classList.add('d-none');
+                noVideoMessage.classList.remove('d-none');
+            }
+            
+            videoModal.show();
+        }
+
         // Auto-refresh the page every 30 seconds to get latest data
         setInterval(() => {
-            location.reload();
+            // Check if modal is open, if not, reload
+            const modalElement = document.getElementById('videoModal');
+            if (!modalElement.classList.contains('show') && modalElement.style.display !== 'block') {
+                location.reload();
+            }
         }, 30000);
         
         // Function to handle flagging a session
@@ -304,5 +452,6 @@ $csrf_token = generateCSRFToken();
             }
         }
     </script>
+    <script defer src="theme.js"></script>
 </body>
 </html>

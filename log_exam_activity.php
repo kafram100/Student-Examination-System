@@ -8,8 +8,8 @@ header('Access-Control-Allow-Methods: POST');
 header('Access-Control-Allow-Headers: Content-Type');
 header('Content-Type: application/json');
 
-// Only allow logged in users
-if (!isset($_SESSION['user_id'])) {
+// Only allow students or authenticated users
+if (!isset($_SESSION['user_id']) && !isset($_SESSION['student_index'])) {
     http_response_code(401);
     echo json_encode(['error' => 'Unauthorized']);
     exit;
