@@ -273,6 +273,76 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             }).catch(err => console.error('Failed to log activity:', err));
         }
         
+        // Function to capture screenshot
+        function captureScreenshot(type, description) {
+            // Create a canvas to capture the screen
+            const canvas = document.createElement('canvas');
+            canvas.width = window.screen.width;
+            canvas.height = window.screen.height;
+            
+            const ctx = canvas.getContext('2d');
+            
+            // Draw the current page content to canvas
+            html2canvas(document.body, {
+                onclone: function(clonedDoc) {
+                    // Hide any overlays or modals that shouldn't be captured
+                    const overlays = clonedDoc.querySelectorAll('.proctoring-overlay, .proctoring-modal');
+                    overlays.forEach(overlay => overlay.style.display = 'none');
+                }
+            }).then(canvas => {
+                const imageData = canvas.toDataURL('image/jpeg', 0.8);
+                
+                const formData = new FormData();
+                formData.append('image_data', imageData);
+                formData.append('exam_attempt_id', <?= $attempt['id'] ?? 0 ?>);
+                formData.append('activity_type', type);
+                formData.append('description', description);
+                formData.append('severity', getSeverityForActivity(type));
+                formData.append('csrf_token', document.querySelector('input[name="csrf_token"]')?.value || '');
+                
+                fetch('capture_image.php', {
+                    method: 'POST',
+                    body: formData
+                }).catch(err => console.error('Failed to capture screenshot:', err));
+            });
+        }
+        
+        function getSeverityForActivity(activityType) {
+            const severityMap = {
+                'tab_switch': 'high',
+                'window_blur': 'medium',
+                'print_attempt': 'medium',
+                'right_click': 'low',
+                'dev_tools': 'high',
+                'copy_attempt': 'medium',
+                'paste_attempt': 'medium',
+                'screenshot_attempt': 'high',
+                'exit_fullscreen': 'high',
+                'camera_disabled': 'critical'
+            };
+            return severityMap[activityType] || 'medium';
+        }
+        
+        // Load html2canvas library for screenshot functionality
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        document.head.appendChild(script);
+        
+        // Monitor for tab switching and capture screenshots
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                // Tab switched away - capture screenshot
+                captureScreenshot('tab_switch', 'Student switched away from exam tab');
+                logActivity('tab_switch', 'Student switched away from exam tab', 'high');
+            }
+        });
+        
+        window.addEventListener('blur', function() {
+            // Window lost focus - capture screenshot
+            captureScreenshot('window_blur', 'Exam window lost focus');
+            logActivity('window_blur', 'Exam window lost focus', 'medium');
+        });
+        
         // Monitor for multiple device usage
         window.addEventListener('focus', function() {
             // Record focus events that might indicate tab switching

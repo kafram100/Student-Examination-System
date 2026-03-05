@@ -302,12 +302,12 @@ $csrf_token = generateCSRFToken();
                                             
                                             <div class="mt-3">
                                                 <div class="video-preview">
-                                                    <span class="text-light">Video Feed</span>
+                                                    <span class="text-light">Proctoring Active</span>
                                                 </div>
                                             </div>
                                             
                                             <div class="d-flex gap-2 mt-3">
-                                                <button class="btn btn-sm btn-primary flex-fill" onclick="viewVideo('<?= htmlspecialchars(basename($session['video_recording_path'] ?? '')) ?>', '<?= htmlspecialchars($session['student_username'], ENT_QUOTES) ?>')">
+                                                <button class="btn btn-sm btn-primary flex-fill" onclick="viewEvidence('<?= $session['student_id'] ?>', '<?= htmlspecialchars($session['student_username'], ENT_QUOTES) ?>')">
                                                     <i class="bi bi-eye me-1"></i>View
                                                 </button>
                                                 <button class="btn btn-sm btn-outline-danger flex-fill">
@@ -347,6 +347,31 @@ $csrf_token = generateCSRFToken();
                                             <span class="badge bg-secondary"><?= htmlspecialchars($log['activity_type']) ?></span>
                                         </div>
                                         <p class="mb-0 small"><?= htmlspecialchars($log['description']) ?></p>
+                                        <?php
+                                        // Check if there are images associated with this activity
+                                        $activity_images = [];
+                                        $upload_dir = __DIR__ . '/uploads/proctoring/';
+                                        if (is_dir($upload_dir)) {
+                                            $files = scandir($upload_dir);
+                                            foreach ($files as $file) {
+                                                if (strpos($file, 'proctoring_img_' . $log['exam_attempt_id'] . '_') !== false) {
+                                                    $activity_images[] = 'uploads/proctoring/' . $file;
+                                                }
+                                            }
+                                        }
+                                        if (!empty($activity_images)): ?>
+                                        <div class="mt-2">
+                                            <small class="text-info">Captured evidence:</small>
+                                            <div class="d-flex gap-2 mt-1">
+                                                <?php foreach (array_slice($activity_images, 0, 3) as $img): // Show up to 3 images ?>
+                                                <img src="<?= $img ?>" alt="Evidence" class="rounded" style="width: 60px; height: 40px; object-fit: cover; border: 1px solid var(--info);">
+                                                <?php endforeach; ?>
+                                                <?php if (count($activity_images) > 3): ?>
+                                                <small class="text-muted">+<?= count($activity_images) - 3 ?> more</small>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                        <?php endif; ?>
                                     </div>
                                 <?php endforeach; ?>
                             </div>
@@ -376,22 +401,24 @@ $csrf_token = generateCSRFToken();
         </div>
     </div>
 
-    <!-- Video Modal -->
-    <div class="modal fade" id="videoModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
+    <!-- Evidence Modal -->
+    <div class="modal fade" id="evidenceModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
             <div class="modal-content card-modern">
                 <div class="modal-header card-header-modern">
-                    <h5 class="modal-title"><i class="bi bi-camera-video me-2"></i>Video Record: <span id="modalStudentName"></span></h5>
+                    <h5 class="modal-title"><i class="bi bi-images me-2"></i>Cheating Evidence: <span id="modalStudentName"></span></h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body text-center p-0" style="background: #000; position: relative;">
-                    <video id="proctoringVideoPlayer" controls style="width: 100%; max-height: 70vh;">
-                        Your browser does not support the video tag.
-                    </video>
-                    <div id="noVideoMessage" class="p-5 d-none d-flex flex-column align-items-center justify-content-center" style="height: 400px; background: var(--bs-body-bg);">
-                        <i class="bi bi-camera-video-off display-1 text-muted mb-3"></i>
-                        <h4 style="color: var(--bs-body-color);">No Video Available</h4>
-                        <p class="text-muted">The video recording for this session is not available yet or could not be loaded.</p>
+                <div class="modal-body p-0" style="background: var(--bs-body-bg); position: relative;">
+                    <div id="evidenceContainer" class="p-3">
+                        <div id="evidenceImages" class="row g-3">
+                            <!-- Images will be loaded here dynamically -->
+                        </div>
+                        <div id="noEvidenceMessage" class="d-none text-center py-5">
+                            <i class="bi bi-image display-1 text-muted mb-3"></i>
+                            <h4 class="text-muted">No Evidence Found</h4>
+                            <p class="text-muted">No images or screenshots captured for this student's session.</p>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer" style="border-top: 1px solid var(--gray-200);">
@@ -403,42 +430,88 @@ $csrf_token = generateCSRFToken();
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        let videoModal;
+        let evidenceModal;
         
         document.addEventListener('DOMContentLoaded', function() {
-            videoModal = new bootstrap.Modal(document.getElementById('videoModal'));
+            evidenceModal = new bootstrap.Modal(document.getElementById('evidenceModal'));
             
-            // Stop video when modal is closed
-            document.getElementById('videoModal').addEventListener('hidden.bs.modal', function () {
-                const videoPlayer = document.getElementById('proctoringVideoPlayer');
-                videoPlayer.pause();
-                videoPlayer.src = '';
+            // Clear evidence when modal is closed
+            document.getElementById('evidenceModal').addEventListener('hidden.bs.modal', function () {
+                const evidenceImages = document.getElementById('evidenceImages');
+                evidenceImages.innerHTML = '';
+                document.getElementById('noEvidenceMessage').classList.remove('d-none');
             });
         });
 
-        function viewVideo(videoFileName, studentName) {
+        function viewEvidence(studentId, studentName) {
             document.getElementById('modalStudentName').textContent = studentName;
-            const videoPlayer = document.getElementById('proctoringVideoPlayer');
-            const noVideoMessage = document.getElementById('noVideoMessage');
+            const evidenceImages = document.getElementById('evidenceImages');
+            const noEvidenceMessage = document.getElementById('noEvidenceMessage');
             
-            if (videoFileName) {
-                videoPlayer.src = 'uploads/proctoring/' + videoFileName;
-                videoPlayer.classList.remove('d-none');
-                noVideoMessage.classList.add('d-none');
-                videoPlayer.play().catch(e => console.log("Auto-play prevented", e));
-            } else {
-                videoPlayer.src = '';
-                videoPlayer.classList.add('d-none');
-                noVideoMessage.classList.remove('d-none');
-            }
+            // Clear previous content
+            evidenceImages.innerHTML = '';
             
-            videoModal.show();
+            // Fetch evidence images for this student
+            fetch('api/fetch-evidence.php?student_id=' + studentId)
+                .then(function(response) {
+                    return response.json();
+                })
+                .then(function(data) {
+                    if (data.success && data.images && data.images.length > 0) {
+                        data.images.forEach(function(image) {
+                            var col = document.createElement('div');
+                            col.className = 'col-md-6 col-lg-4';
+                            
+                            var img = document.createElement('img');
+                            img.src = image.path;
+                            img.className = 'card-img-top';
+                            img.alt = 'Cheating Evidence';
+                            img.style = 'height: 200px; object-fit: cover;';
+                            
+                            var card = document.createElement('div');
+                            card.className = 'card';
+                            
+                            var cardBody = document.createElement('div');
+                            cardBody.className = 'card-body';
+                            
+                            var timestamp = document.createElement('p');
+                            timestamp.className = 'card-text small text-muted';
+                            timestamp.textContent = image.timestamp;
+                            
+                            var desc = document.createElement('p');
+                            desc.className = 'card-text small';
+                            desc.textContent = image.activity_type + ': ' + image.description;
+                            
+                            cardBody.appendChild(timestamp);
+                            cardBody.appendChild(desc);
+                            
+                            card.appendChild(img);
+                            card.appendChild(cardBody);
+                            
+                            col.appendChild(card);
+                            evidenceImages.appendChild(col);
+                        });
+                        
+                        noEvidenceMessage.classList.add('d-none');
+                        evidenceImages.classList.remove('d-none');
+                    } else {
+                        noEvidenceMessage.classList.remove('d-none');
+                        evidenceImages.classList.add('d-none');
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Error fetching evidence:', error);
+                    noEvidenceMessage.classList.remove('d-none');
+                    evidenceImages.classList.add('d-none');
+                });
+            
+            evidenceModal.show();
         }
 
         // Auto-refresh the page every 30 seconds to get latest data
         setInterval(() => {
             // Check if modal is open, if not, reload
-            const modalElement = document.getElementById('videoModal');
+            const modalElement = document.getElementById('evidenceModal');
             if (!modalElement.classList.contains('show') && modalElement.style.display !== 'block') {
                 location.reload();
             }

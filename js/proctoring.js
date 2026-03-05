@@ -174,23 +174,67 @@ class ExamProctoring {
         }
     }
 
-    saveEvidence(violationType) {
-        if (this.recordingChunks.length === 0) return;
+    captureImageEvidence(violationType, description) {
+        // Capture an image from the current video stream
+        if (!this.videoStream) return;
 
-        // Clone current buffer
-        const evidenceChunks = [...this.recordingChunks];
-        const blob = new Blob(evidenceChunks, { type: 'video/webm' });
+        const canvas = document.createElement('canvas');
+        const videoElement = document.createElement('video');
+        
+        // Get the video track from the stream
+        const videoTrack = this.videoStream.getVideoTracks()[0];
+        if (!videoTrack) return;
+        
+        // Create a temporary video element
+        videoElement.srcObject = this.videoStream;
+        videoElement.play();
+        
+        videoElement.addEventListener('loadedmetadata', () => {
+            canvas.width = videoElement.videoWidth;
+            canvas.height = videoElement.videoHeight;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+            
+            // Convert to data URL
+            const imageData = canvas.toDataURL('image/jpeg', 0.8);
+            
+            // Send image to server
+            this.sendImageToServer(imageData, violationType, description);
+        });
+    }
+    
+    sendImageToServer(imageData, violationType, description) {
         const formData = new FormData();
-        formData.append('recording', blob, `violation_${violationType}_${Date.now()}.webm`);
+        formData.append('image_data', imageData);
         formData.append('exam_attempt_id', this.getExamAttemptId());
+        formData.append('activity_type', violationType);
+        formData.append('description', description);
+        formData.append('severity', this.getSeverityForActivity(violationType));
         formData.append('csrf_token', this.getCSRFToken());
 
-        fetch('save_recording.php', {
+        fetch('capture_image.php', {
             method: 'POST',
             body: formData
         }).catch(error => {
-            console.error('Error saving evidence video:', error);
+            console.error('Error saving evidence image:', error);
         });
+    }
+    
+    getSeverityForActivity(activityType) {
+        const severityMap = {
+            'tab_switch': 'high',
+            'window_blur': 'medium',
+            'print_attempt': 'medium',
+            'right_click': 'low',
+            'dev_tools': 'high',
+            'copy_attempt': 'medium',
+            'paste_attempt': 'medium',
+            'screenshot_attempt': 'high',
+            'exit_fullscreen': 'high',
+            'camera_disabled': 'critical'
+        };
+        return severityMap[activityType] || 'medium';
     }
 
     connectMonitoringServer() {
@@ -228,6 +272,7 @@ class ExamProctoring {
         // Detect tab switching
         document.addEventListener('visibilitychange', () => {
             if (document.hidden && this.examStarted) {
+                this.captureImageEvidence('tab_switch', 'Student switched away from exam tab');
                 this.logSuspiciousActivity('tab_switch', 'Student switched away from exam tab');
                 this.sendSecurityAlert('Student switched away from exam tab');
                 this.showViolationOverlay('Tab switching is strictly prohibited during the exam. Your activity has been permanently recorded.');
@@ -237,6 +282,7 @@ class ExamProctoring {
         // Detect window focus loss
         window.addEventListener('blur', () => {
             if (this.examStarted) {
+                this.captureImageEvidence('window_blur', 'Exam window lost focus');
                 this.logSuspiciousActivity('window_blur', 'Exam window lost focus');
                 this.sendSecurityAlert('Exam window lost focus');
                 this.showViolationOverlay('You are not allowed to leave the exam window. Your activity has been permanently recorded.');
@@ -246,6 +292,7 @@ class ExamProctoring {
         // Prevent print
         window.addEventListener('beforeprint', (e) => {
             e.preventDefault();
+            this.captureImageEvidence('print_attempt', 'Student attempted to print');
             this.logSuspiciousActivity('print_attempt', 'Student attempted to print');
             this.sendSecurityAlert('Student attempted to print exam');
         });
@@ -253,6 +300,7 @@ class ExamProctoring {
         // Prevent right-click
         document.addEventListener('contextmenu', (e) => {
             e.preventDefault();
+            this.captureImageEvidence('right_click', 'Student attempted to right-click');
             this.logSuspiciousActivity('right_click', 'Student attempted to right-click');
             this.sendSecurityAlert('Student attempted to right-click');
         });
@@ -264,6 +312,7 @@ class ExamProctoring {
                 (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74)) ||
                 (e.ctrlKey && e.keyCode === 85)) {
                 e.preventDefault();
+                this.captureImageEvidence('dev_tools', 'Student attempted to open developer tools');
                 this.logSuspiciousActivity('dev_tools', 'Student attempted to open developer tools');
                 this.sendSecurityAlert('Student attempted to open developer tools');
             }
@@ -272,20 +321,22 @@ class ExamProctoring {
         // Prevent copy/paste
         document.addEventListener('copy', (e) => {
             e.preventDefault();
+            this.captureImageEvidence('copy_attempt', 'Student attempted to copy content');
             this.logSuspiciousActivity('copy_attempt', 'Student attempted to copy content');
             this.sendSecurityAlert('Student attempted to copy content');
         });
 
         document.addEventListener('paste', (e) => {
             e.preventDefault();
+            this.captureImageEvidence('paste_attempt', 'Student attempted to paste content');
             this.logSuspiciousActivity('paste_attempt', 'Student attempted to paste content');
             this.sendSecurityAlert('Student attempted to paste content');
         });
     }
 
     logSuspiciousActivity(type, description) {
-        // Grab recent video buffer chunks for this exact violation
-        this.saveEvidence(type);
+        // Capture image for this exact violation
+        this.captureImageEvidence(type, description);
 
         const activityData = {
             type: type,
