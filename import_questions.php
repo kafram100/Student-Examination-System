@@ -38,32 +38,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
         // Skip header row
         fgetcsv($handle);
         
-        $stmt = $pdo->prepare("INSERT INTO questions (exam_id, question_text, option_a, option_b, option_c, option_d, option_e, correct_option, marks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt = $pdo->prepare("INSERT INTO questions (exam_id, q_type, question_text, option_a, option_b, option_c, option_d, option_e, correct_option, marks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         
         while (($row = fgetcsv($handle)) !== FALSE) {
-            // Validation: Ensure minimum columns exist (question + 2 options + correct + marks)
-            if (count($row) < 8) continue;
+            // Validation: Ensure minimum columns exist (type + question + correct + marks)
+            if (count($row) < 4) continue;
             
-            $question_text = trim($row[0]);
-            $option_a = trim($row[1]);
-            $option_b = trim($row[2]);
-            $option_c = trim($row[3]);
-            $option_d = trim($row[4]);
-            $option_e = trim($row[5]); // Optional
-            $correct_option = strtoupper(trim($row[6]));
-            $marks = (int)$row[7];
+            $q_type = strtolower(trim($row[0]));
+            $question_text = trim($row[1]);
+            $option_a = trim($row[2]);
+            $option_b = trim($row[3]);
+            $option_c = trim($row[4]);
+            $option_d = trim($row[5]);
+            $option_e = trim($row[6]);
+            $correct_answer = trim($row[7]);
+            $marks = isset($row[8]) ? (int)$row[8] : 1;
             
-            if (empty($question_text) || empty($option_a) || empty($option_b) || empty($correct_option)) {
-                continue; // Skip invalid rows
+            // Validate question type
+            if (!in_array($q_type, ['mcq', 'fill_in', 'theory', 'file'])) {
+                continue; // Skip invalid question types
             }
             
-            if (!in_array($correct_option, ['A', 'B', 'C', 'D', 'E'])) {
-                continue; // Invalid correct option
+            if (empty($question_text)) {
+                continue; // Skip questions without text
             }
-
+            
+            // Handle different question types
+            $correct_option = null;
+            
+            if ($q_type === 'mcq') {
+                // For MCQ, correct_answer should be A, B, C, D, or E
+                $correct_option = strtoupper($correct_answer);
+                if (!in_array($correct_option, ['A', 'B', 'C', 'D', 'E'])) {
+                    continue; // Invalid correct option
+                }
+                if (empty($option_a) || empty($option_b)) {
+                    continue; // MCQ must have at least 2 options
+                }
+            } elseif ($q_type === 'fill_in') {
+                // For fill-in, correct_answer is the actual answer text
+                if (empty($correct_answer)) {
+                    continue; // Fill-in must have a correct answer
+                }
+                $correct_option = $correct_answer;
+            } elseif ($q_type === 'theory' || $q_type === 'file') {
+                // Theory and file questions don't need correct answers
+                $correct_option = null;
+            }
+            
+            // Clean up empty options
+            $option_c = $option_c !== '' ? $option_c : null;
+            $option_d = $option_d !== '' ? $option_d : null;
+            $option_e = $option_e !== '' ? $option_e : null;
+            
             // Insert
             try {
-                $stmt->execute([$exam_id, $question_text, $option_a, $option_b, $option_c, $option_d, $option_e, $correct_option, $marks]);
+                $stmt->execute([$exam_id, $q_type, $question_text, $option_a, $option_b, $option_c, $option_d, $option_e, $correct_option, $marks]);
                 $imported_count++;
             } catch (Exception $e) {
                 // Ignore specific failed rows
@@ -109,7 +139,17 @@ $csrf_token = generateCSRFToken();
                         <?php endif; ?>
 
                         <p>Upload a CSV file with the following columns: <br>
-                        <code>question_text, option_a, option_b, option_c, option_d, option_e, correct_option, marks</code></p>
+                        <code>question_type, question_text, option_a, option_b, option_c, option_d, option_e, correct_answer, marks</code></p>
+                        
+                        <div class="alert alert-info">
+                            <strong>Question Types:</strong><br>
+                            <ul class="mb-0">
+                                <li><strong>mcq</strong> - Multiple Choice (requires options A-E and correct answer as A/B/C/D/E)</li>
+                                <li><strong>fill_in</strong> - Fill-in-the-blank (requires the correct answer text)</li>
+                                <li><strong>theory</strong> - Theory/Short answer (no correct answer needed)</li>
+                                <li><strong>file</strong> - File upload (students upload a file)</li>
+                            </ul>
+                        </div>
                         
                         <a href="download_template.php" class="btn btn-outline-primary mb-3">Download CSV Template</a>
 

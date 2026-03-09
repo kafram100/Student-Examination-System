@@ -5,6 +5,10 @@ require 'auth.php';
 // Clear any existing student session data
 unset($_SESSION['student_index']);
 unset($_SESSION['student_fullname']);
+unset($_SESSION['exam_attempt_id']);
+unset($_SESSION['proctoring_enabled']);
+unset($_SESSION['proctoring_exam_id']);
+
 
 $exam_code = $_GET['exam_code'] ?? '';
 

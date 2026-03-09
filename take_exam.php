@@ -16,22 +16,13 @@ $stmt = $pdo->prepare("SELECT * FROM exams WHERE id = ?");
 $stmt->execute([$exam_id]);
 $exam = $stmt->fetch();
 
-// Require proctoring for all exams
-$requires_proctoring = true;
-
-// If proctoring is required but not enabled, redirect
-if ($requires_proctoring && !isset($_SESSION['proctoring_enabled'])) {
-    $_SESSION['exam_id'] = $exam_id;  // Store exam ID for after proctoring check
-    $_SESSION['student_index'] = $student_index;
-}
-
-// Fetch Exam Details
-$stmt = $pdo->prepare("SELECT * FROM exams WHERE id = ?");
-$stmt->execute([$exam_id]);
-$exam = $stmt->fetch();
-
 if (!$exam || !$exam['is_published']) {
     die("Exam not available.");
+}
+
+$requires_proctoring = requiresProctoringForExamType($exam['exam_type'] ?? '');
+if (!$requires_proctoring) {
+    unset($_SESSION['proctoring_enabled'], $_SESSION['proctoring_exam_id']);
 }
 
 // Check/Create Attempt
@@ -67,6 +58,9 @@ if ($active_attempt) {
     // Set the exam attempt ID in session for proctoring
     $_SESSION['exam_attempt_id'] = $attempt['id'];
 }
+// Keep attempt id available for proctoring/session APIs
+$_SESSION['exam_attempt_id'] = $attempt['id'];
+
 
 // Calculate remaining time
 $is_unlimited = ($exam['duration'] <= 0);
@@ -202,8 +196,14 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             color: #856404 !important;
         }
     </style>
+    <?php if ($requires_proctoring): ?>
     <script src="js/proctoring.js"></script>
+    <?php endif; ?>
     <script>
+        const isProctoringRequired = <?= json_encode($requires_proctoring) ?>;
+
+        // Proctoring-only security restrictions
+        if (isProctoringRequired) {
         // Anti-screenshot, anti-copy measures
         document.addEventListener('contextmenu', function(e) {
             logActivity('right_click', 'User attempted to right-click', 'medium');
@@ -348,6 +348,8 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             // Record focus events that might indicate tab switching
             logActivity('window_focus', 'Window gained focus', 'low');
         });
+        }
+
         let timeLeft = <?= $remaining_sec ?>;
         let isUnlimited = <?= $is_unlimited ? 'true' : 'false' ?>;
         
@@ -363,7 +365,14 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
                 saveAllAnswers();
                 // Small delay to allow autosave to complete
                 setTimeout(() => {
-                    document.getElementById('examForm').submit();
+                    const examForm = document.getElementById('examForm');
+                    if (examForm) {
+                        if (typeof examForm.requestSubmit === 'function') {
+                            examForm.requestSubmit();
+                        } else {
+                            examForm.submit();
+                        }
+                    }
                 }, 500);
             } else {
                 timeLeft--;
@@ -431,6 +440,7 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
                 document.getElementById('start-proctoring-btn').addEventListener('click', startExamWithProctoring);
             } else {
                 // Skip proctoring, start exam normally
+                document.getElementById('exam-content-area').style.display = 'block';
                 updateTimer();
                 initAutosave();
             }
@@ -720,6 +730,7 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
     </script>
 </head>
 <body>
+    <?php if ($requires_proctoring): ?>
     <!-- Proctoring Modal -->
     <div id="proctoringModal" class="proctoring-overlay" style="display: none;">
         <div class="proctoring-modal">
@@ -744,7 +755,8 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             </div>
         </div>
     </div>
-    <div id="exam-content-area" style="display: none;">
+    <?php endif; ?>
+    <div id="exam-content-area" style="display: <?= $requires_proctoring ? 'none' : 'block'; ?>;">
         <?php if (!$is_unlimited): ?>
             <div class="timer-bar">
                 Time Remaining: <span id="timer"></span>
@@ -840,4 +852,7 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
     <script defer src="theme.js"></script>
 </body>
 </html>
+
+
+
 

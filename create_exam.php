@@ -155,6 +155,7 @@ $csrf_token = generateCSRFToken();
                                         <option value="Quiz">Quiz</option>
                                         <option value="Assignment">Assignment</option>
                                     </select>
+                                    <small class="text-muted">Proctoring monitor applies only to <strong>Exam</strong>, <strong>Mid-semester</strong>, and <strong>Quiz</strong>. <strong>Assignment</strong> is not proctored.</small>
                                 </div>
                                 <div class="col-md-8">
                                     <label>Assessment Title *</label>
@@ -329,4 +330,5 @@ $csrf_token = generateCSRFToken();
     </script>
 </body>
 </html>
+
 

@@ -33,9 +33,12 @@ $exam_reports = $reports_stmt->fetchAll();
 
 // Build query for activity logs
 $activity_query = "
-    SELECT eal.*, COALESCE(u.username, a.student_fullname) as student_username, e.title as exam_title, a.student_index
+    SELECT
+        eal.*,
+        COALESCE(NULLIF(a.student_fullname, ''), CONCAT('Student ', a.student_index), 'Unknown Student') as student_username,
+        e.title as exam_title,
+        a.student_index
     FROM exam_activity_logs eal
-    LEFT JOIN users u ON eal.user_id = u.id
     JOIN attempts a ON eal.exam_attempt_id = a.id
     JOIN exams e ON a.exam_id = e.id
     WHERE e.user_id = ?
@@ -70,11 +73,40 @@ $activity_stmt = $pdo->prepare($activity_query);
 $activity_stmt->execute($params);
 $activity_logs = $activity_stmt->fetchAll();
 
+$grouped_activity_logs = [];
+foreach ($activity_logs as $log) {
+    $student_name = trim((string)($log['student_username'] ?? 'Unknown Student'));
+    if ($student_name === '') {
+        $student_name = 'Unknown Student';
+    }
+
+    $student_index_value = trim((string)($log['student_index'] ?? 'N/A'));
+    if ($student_index_value === '') {
+        $student_index_value = 'N/A';
+    }
+
+    $group_key = $student_name . '|' . $student_index_value;
+
+    if (!isset($grouped_activity_logs[$group_key])) {
+        $grouped_activity_logs[$group_key] = [
+            'student_name' => $student_name,
+            'student_index' => $student_index_value,
+            'logs' => []
+        ];
+    }
+
+    $grouped_activity_logs[$group_key]['logs'][] = $log;
+}
+
+$grouped_activity_logs = array_values($grouped_activity_logs);
 // Build query for cheating incidents
 $incidents_query = "
-    SELECT ci.*, COALESCE(u.username, a.student_fullname) as student_username, e.title as exam_title, a.student_index
+    SELECT
+        ci.*,
+        COALESCE(NULLIF(a.student_fullname, ''), CONCAT('Student ', a.student_index), 'Unknown Student') as student_username,
+        e.title as exam_title,
+        a.student_index
     FROM cheating_incidents ci
-    LEFT JOIN users u ON ci.user_id = u.id
     JOIN attempts a ON ci.exam_attempt_id = a.id
     JOIN exams e ON a.exam_id = e.id
     WHERE e.user_id = ?
@@ -126,12 +158,41 @@ $csrf_token = generateCSRFToken();
             border-radius: 0 4px 4px 0;
             background: transparent;
         }
-        
+
         .activity-item.low { border-left-color: var(--success); }
         .activity-item.medium { border-left-color: var(--warning); }
         .activity-item.high { border-left-color: var(--info); }
         .activity-item.critical { border-left-color: var(--danger); background-color: var(--danger-light); }
-        
+
+        .activity-accordion .accordion-item {
+            border: 1px solid var(--gray-200);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 0.75rem;
+        }
+
+        .activity-accordion .accordion-button {
+            background: #ffffff;
+            color: #1e293b;
+            font-weight: 600;
+            box-shadow: none;
+        }
+
+        .activity-accordion .accordion-button:not(.collapsed) {
+            background: var(--gray-100);
+            color: #0f172a;
+        }
+
+        .activity-accordion .accordion-body {
+            background: #ffffff;
+            border-top: 1px solid var(--gray-200);
+            padding: 0.875rem;
+        }
+
+        .student-group-meta {
+            font-size: 0.85rem;
+        }
+
         .incident-card {
             border: 1px solid var(--gray-200);
             border-radius: var(--radius-lg);
@@ -237,11 +298,30 @@ $csrf_token = generateCSRFToken();
             border-top-color: #334155 !important;
         }
 
-        body.theme-dark .activity-item {
-            border-left-color: #475569 !important;
+                body.theme-dark .activity-accordion .accordion-item {
+            border-color: #334155 !important;
+            background: #1e293b !important;
         }
-        
-        body.theme-dark .btn-outline-secondary,
+
+        body.theme-dark .activity-accordion .accordion-button {
+            background: #1e293b !important;
+            color: #f1f5f9 !important;
+        }
+
+        body.theme-dark .activity-accordion .accordion-button:not(.collapsed) {
+            background: #263448 !important;
+            color: #f8fafc !important;
+        }
+
+        body.theme-dark .activity-accordion .accordion-button::after {
+            filter: invert(1) brightness(1.8);
+        }
+
+        body.theme-dark .activity-accordion .accordion-body {
+            background: #1e293b !important;
+            border-top-color: #334155 !important;
+        }
+body.theme-dark .btn-outline-secondary,
         body.theme-dark .btn-outline-light {
             color: #f1f5f9 !important;
             border-color: #475569 !important;
@@ -351,26 +431,60 @@ $csrf_token = generateCSRFToken();
                                 <p>No activity logs found for the selected criteria</p>
                             </div>
                         <?php else: ?>
-                            <div class="activity-logs-list">
-                                <?php foreach ($activity_logs as $log): ?>
-                                    <div class="activity-item <?= $log['severity'] ?>">
-                                        <div class="d-flex justify-content-between">
-                                            <strong>
-                                                <?= htmlspecialchars($log['student_username']) ?> 
-                                                (<?= htmlspecialchars($log['student_index']) ?>)
-                                            </strong>
-                                            <small class="text-muted"><?= $log['timestamp'] ?></small>
+                            <div class="accordion activity-accordion" id="activityLogsByStudent">
+                                <?php foreach ($grouped_activity_logs as $group_index => $student_group): ?>
+                                    <?php
+                                        $collapse_id = 'studentLogsCollapse' . $group_index;
+                                        $heading_id = 'studentLogsHeading' . $group_index;
+                                        $student_logs = $student_group['logs'];
+                                        $latest_time = (string)($student_logs[0]['timestamp'] ?? '');
+                                    ?>
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header" id="<?= $heading_id ?>">
+                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#<?= $collapse_id ?>" aria-expanded="false" aria-controls="<?= $collapse_id ?>">
+                                                <div class="d-flex justify-content-between align-items-center w-100 me-2 gap-2">
+                                                    <span>
+                                                        <?= htmlspecialchars($student_group['student_name']) ?>
+                                                        <span class="text-muted">(<?= htmlspecialchars($student_group['student_index']) ?>)</span>
+                                                    </span>
+                                                    <span class="d-flex align-items-center gap-2 student-group-meta">
+                                                        <span class="badge bg-primary"><?= count($student_logs) ?> activities</span>
+                                                        <?php if ($latest_time !== ''): ?>
+                                                            <span class="text-muted">Last: <?= htmlspecialchars($latest_time) ?></span>
+                                                        <?php endif; ?>
+                                                    </span>
+                                                </div>
+                                            </button>
+                                        </h2>
+                                        <div id="<?= $collapse_id ?>" class="accordion-collapse collapse" aria-labelledby="<?= $heading_id ?>" data-bs-parent="#activityLogsByStudent">
+                                            <div class="accordion-body">
+                                                <?php foreach ($student_logs as $log): ?>
+                                                    <?php
+                                                        $log_severity = strtolower((string)($log['severity'] ?? 'medium'));
+                                                        if (!in_array($log_severity, ['low', 'medium', 'high', 'critical'], true)) {
+                                                            $log_severity = 'medium';
+                                                        }
+                                                    ?>
+                                                    <div class="activity-item <?= $log_severity ?>">
+                                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                                            <span class="badge bg-secondary"><?= htmlspecialchars($log['activity_type']) ?></span>
+                                                            <span class="severity-badge severity-<?= $log_severity ?>">
+                                                                <?= ucfirst($log_severity) ?>
+                                                            </span>
+                                                        </div>
+                                                        <p class="mb-1 small"><?= htmlspecialchars($log['description']) ?></p>
+                                                        <div class="d-flex justify-content-between">
+                                                            <?php if (!empty($log['exam_title'])): ?>
+                                                                <small class="text-muted">Exam: <?= htmlspecialchars($log['exam_title']) ?></small>
+                                                            <?php else: ?>
+                                                                <small class="text-muted"></small>
+                                                            <?php endif; ?>
+                                                            <small class="text-muted"><?= htmlspecialchars((string)($log['timestamp'] ?? '')) ?></small>
+                                                        </div>
+                                                    </div>
+                                                <?php endforeach; ?>
+                                            </div>
                                         </div>
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <span class="badge bg-secondary"><?= htmlspecialchars($log['activity_type']) ?></span>
-                                            <span class="severity-badge severity-<?= $log['severity'] ?>">
-                                                <?= ucfirst($log['severity']) ?>
-                                            </span>
-                                        </div>
-                                        <p class="mb-0 small"><?= htmlspecialchars($log['description']) ?></p>
-                                        <?php if ($log['exam_title']): ?>
-                                            <small class="text-muted">Exam: <?= htmlspecialchars($log['exam_title']) ?></small>
-                                        <?php endif; ?>
                                     </div>
                                 <?php endforeach; ?>
                             </div>
@@ -419,8 +533,19 @@ $csrf_token = generateCSRFToken();
                                     </div>
                                     
                                     <p class="mb-2"><?= htmlspecialchars($incident['notes']) ?></p>
-                                    
+
                                     <small class="text-muted">Incident occurred at: <?= $incident['incident_timestamp'] ?></small>
+
+                                    <?php if (in_array($incident['status'], ['pending', 'reviewed'], true)): ?>
+                                        <div class="d-flex gap-2 mt-3">
+                                            <button type="button" class="btn btn-sm btn-danger" onclick="updateIncidentStatus(<?= (int)$incident['id'] ?>, 'confirmed')">
+                                                <i class="bi bi-check2-circle me-1"></i>Confirm
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="updateIncidentStatus(<?= (int)$incident['id'] ?>, 'dismissed')">
+                                                <i class="bi bi-x-circle me-1"></i>Dismiss
+                                            </button>
+                                        </div>
+                                    <?php endif; ?>
                                 </div>
                             <?php endforeach; ?>
                         <?php endif; ?>
@@ -503,6 +628,56 @@ $csrf_token = generateCSRFToken();
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const csrfToken = <?= json_encode($csrf_token) ?>;
+
+        function updateIncidentStatus(incidentId, status) {
+            const id = parseInt(incidentId, 10);
+            if (!id || !status) {
+                return;
+            }
+
+            fetch('api/update-incident-status.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                    'Accept': 'application/json'
+                },
+                body: new URLSearchParams({
+                    csrf_token: csrfToken,
+                    incident_id: String(id),
+                    status: String(status)
+                })
+            })
+                .then(function(response) {
+                    return response.json().then(function(data) {
+                        if (!response.ok || !data.success) {
+                            const message = (data && data.error) ? data.error : 'Failed to update incident status';
+                            throw new Error(message);
+                        }
+                        return data;
+                    });
+                })
+                .then(function() {
+                    location.reload();
+                })
+                .catch(function(error) {
+                    alert(error && error.message ? error.message : 'Failed to update incident status');
+                });
+        }
+    </script>
     <script defer src="theme.js"></script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+

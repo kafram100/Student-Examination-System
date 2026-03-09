@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 require 'db.php';
 session_start();
 
@@ -12,9 +12,15 @@ $student_index = $_SESSION['student_index'];
 $exam_id = $_SESSION['exam_id'];
 
 // Fetch Exam Info (to check if results released)
-$stmt = $pdo->prepare("SELECT title, results_released FROM exams WHERE id = ?");
+$stmt = $pdo->prepare("SELECT title, exam_type, results_released FROM exams WHERE id = ?");
 $stmt->execute([$exam_id]);
 $exam = $stmt->fetch();
+
+$assessment_type = trim((string)($exam['exam_type'] ?? ''));
+if ($assessment_type === '') {
+    $assessment_type = 'Assessment';
+}
+
 
 // Use the student info from the attempt record
 $student = ['full_name' => $student_fullname];
@@ -135,7 +141,7 @@ if (!$attempt || $attempt['status'] != 'completed') {
         <?php if (!isset($_GET['view']) || $_GET['view'] !== 'results'): ?>
             <div class="mt-4 mb-4">
                 <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
-                <h2 class="mt-3 text-success">Exam Submitted Successfully!</h2>
+                <h2 class="mt-3 text-success"><?= htmlspecialchars($assessment_type) ?> Submitted Successfully!</h2>
                 <p class="lead mt-3">Your responses have been recorded.</p>
             </div>
         <?php endif; ?>

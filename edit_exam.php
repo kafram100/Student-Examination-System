@@ -143,6 +143,7 @@ $csrf_token = generateCSRFToken();
                                          <option value="Quiz" <?= $exam['exam_type'] === 'Quiz' ? 'selected' : '' ?>>Quiz</option>
                                          <option value="Assignment" <?= $exam['exam_type'] === 'Assignment' ? 'selected' : '' ?>>Assignment</option>
                                      </select>
+                                     <small class="text-muted">Proctoring monitor applies only to <strong>Exam</strong>, <strong>Mid-semester</strong>, and <strong>Quiz</strong>. <strong>Assignment</strong> is not proctored.</small>
                                  </div>
                                  <div class="col-md-8">
                                      <label>Assessment Title *</label>
@@ -290,4 +291,5 @@ $csrf_token = generateCSRFToken();
     </script>
 </body>
 </html>
+
 

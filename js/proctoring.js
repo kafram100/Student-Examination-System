@@ -8,6 +8,9 @@ class ExamProctoring {
         this.mediaRecorder = null;
         this.webSocket = null;
         this.examStarted = false;
+        this.lastEvidenceUploadAt = 0;
+        this.evidenceUploadCooldownMs = 12000;
+        this.submitHooksAttached = false;
 
         this.init();
     }
@@ -142,7 +145,14 @@ class ExamProctoring {
     startRecording() {
         if (!this.videoStream) return;
 
-        this.mediaRecorder = new MediaRecorder(this.videoStream);
+        const recorderOptions = {};
+        if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')) {
+            recorderOptions.mimeType = 'video/webm;codecs=vp8,opus';
+        }
+
+        this.mediaRecorder = Object.keys(recorderOptions).length > 0
+            ? new MediaRecorder(this.videoStream, recorderOptions)
+            : new MediaRecorder(this.videoStream);
         this.recordingChunks = [];
         this.mediaRecorder.ondataavailable = (event) => {
             if (event.data.size > 0) {
@@ -156,7 +166,7 @@ class ExamProctoring {
         };
 
         this.mediaRecorder.onstop = () => {
-            this.saveEvidence('final_submission');
+            this.saveEvidence('final_submission', true);
         };
 
         this.mediaRecorder.start(2000); // Trigger data chunk every 2 seconds
@@ -335,8 +345,9 @@ class ExamProctoring {
     }
 
     logSuspiciousActivity(type, description) {
-        // Capture image for this exact violation
+        // Capture image and short audio/video clip for this exact violation
         this.captureImageEvidence(type, description);
+        this.saveEvidence(type);
 
         const activityData = {
             type: type,
@@ -466,6 +477,7 @@ class ExamProctoring {
 
     startExam() {
         this.examStarted = true;
+        this.attachSubmissionHooks();
 
         // Enter fullscreen mode
         this.enterFullscreen();
@@ -477,6 +489,86 @@ class ExamProctoring {
         this.enableProctoringSession();
     }
 
+    
+    attachSubmissionHooks() {
+        if (this.submitHooksAttached) {
+            return;
+        }
+
+        this.submitHooksAttached = true;
+
+        const form = document.getElementById('examForm');
+        if (form) {
+            form.addEventListener('submit', (event) => {
+                if (!this.isRecording) {
+                    return;
+                }
+
+                event.preventDefault();
+                this.saveEvidence('exam_submit', true);
+                this.stopRecording();
+
+                setTimeout(() => {
+                    form.submit();
+                }, 450);
+            }, { once: true });
+        }
+
+        window.addEventListener('beforeunload', () => {
+            this.saveEvidence('page_unload', true);
+        });
+    }
+
+    saveEvidence(reason, force = false) {
+        const attemptId = this.getExamAttemptId();
+        if (!attemptId || attemptId === 'unknown') {
+            return;
+        }
+
+        if (!Array.isArray(this.recordingChunks) || this.recordingChunks.length < 1) {
+            return;
+        }
+
+        const now = Date.now();
+        if (!force && (now - this.lastEvidenceUploadAt) < this.evidenceUploadCooldownMs) {
+            return;
+        }
+
+        const mimeType = (this.mediaRecorder && this.mediaRecorder.mimeType)
+            ? this.mediaRecorder.mimeType
+            : 'video/webm';
+
+        const recordingBlob = new Blob(this.recordingChunks, { type: mimeType });
+        if (recordingBlob.size < 1024) {
+            return;
+        }
+
+        const formData = new FormData();
+        const safeReason = String(reason || 'evidence').replace(/[^a-zA-Z0-9_-]/g, '_');
+        const filename = 'evidence_' + safeReason + '_' + now + '.webm';
+
+        formData.append('recording', recordingBlob, filename);
+        formData.append('exam_attempt_id', String(attemptId));
+        formData.append('reason', safeReason);
+        formData.append('csrf_token', this.getCSRFToken());
+
+        this.lastEvidenceUploadAt = now;
+
+        if (force && navigator.sendBeacon) {
+            const sent = navigator.sendBeacon('save_recording.php', formData);
+            if (sent) {
+                return;
+            }
+        }
+
+        fetch('save_recording.php', {
+            method: 'POST',
+            body: formData,
+            keepalive: true
+        }).catch(error => {
+            console.error('Error saving evidence recording:', error);
+        });
+    }
     enableProctoringSession() {
         fetch('enable_proctoring.php', {
             method: 'POST',
@@ -550,3 +642,5 @@ document.addEventListener('DOMContentLoaded', () => {
         window.examProctoring = new ExamProctoring();
     }
 });
+
+

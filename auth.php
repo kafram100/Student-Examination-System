@@ -171,6 +171,19 @@ function sanitizeInput($data) {
     return htmlspecialchars(strip_tags(trim($data)), ENT_QUOTES, 'UTF-8');
 }
 
+function normalizeAssessmentType($examType) {
+    if (!is_string($examType)) {
+        return '';
+    }
+
+    $decoded = html_entity_decode($examType, ENT_QUOTES, 'UTF-8');
+    return strtolower(trim($decoded));
+}
+
+function requiresProctoringForExamType($examType) {
+    $normalized = normalizeAssessmentType($examType);
+    return in_array($normalized, ['exam', 'mid-semester', 'mid semester', 'quiz'], true);
+}
 // Validate email
 function validateEmail($email) {
     return filter_var($email, FILTER_VALIDATE_EMAIL);
@@ -224,3 +237,5 @@ function storeUploadedFile($file, $uploadDir, array $allowedExtensions, array $a
     return ['path' => str_replace('\\', '/', $destPath), 'error' => null];
 }
 ?>
+
+

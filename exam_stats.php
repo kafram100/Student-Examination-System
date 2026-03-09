@@ -34,7 +34,7 @@ $stmt = $pdo->prepare("
                WHERE ax.attempt_id = a.id AND qx.q_type <> 'mcq' AND ax.marks_awarded IS NOT NULL
            ) AS manual_graded
     FROM attempts a 
-    WHERE a.exam_id = ? 
+    WHERE a.exam_id = ? AND a.status = 'completed'
     ORDER BY a.score DESC
 ");
 $stmt->execute([$exam_id]);
@@ -412,56 +412,40 @@ $csrf_token = generateCSRFToken();
                     <tr>
                         <th>Index Number</th>
                         <th>Full Name</th>
-                        <th>Program</th>
                         <th>Score</th>
                         <th>Total Marks</th>
-                        <th>%</th>
-                        <th>Grading</th>
                         <th>Time Spent</th>
                         <th>Date</th>
                         <th class="no-print">Action</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($attempts as $attempt): ?>
-                        <?php
-                            $start = strtotime($attempt['start_time']);
-                            $end = strtotime($attempt['submit_time']);
-                            $duration = $end - $start;
-                            $minutes = floor($duration / 60);
-                            $seconds = $duration % 60;
-                            $percentage = ($attempt['total_marks'] > 0) ? ($attempt['score'] / $attempt['total_marks']) * 100 : 0;
-                            $manual_count = (int)($attempt['manual_count'] ?? 0);
-                            $manual_graded = (int)($attempt['manual_graded'] ?? 0);
-                            if ($manual_count === 0) {
-                                $grade_label = 'Auto';
-                                $grade_class = 'bg-success';
-                                $grade_text = $grade_label;
-                            } elseif ($manual_graded >= $manual_count) {
-                                $grade_label = 'Graded';
-                                $grade_class = 'bg-primary';
-                                $grade_text = $grade_label . " ({$manual_graded}/{$manual_count})";
-                            } else {
-                                $grade_label = 'Pending';
-                                $grade_class = 'bg-warning text-dark';
-                                $grade_text = $grade_label . " ({$manual_graded}/{$manual_count})";
-                            }
-                        ?>
+                    <?php if (empty($attempts)): ?>
                         <tr>
-                            <td><?= htmlspecialchars($attempt['student_index']) ?></td>
-                            <td><?= htmlspecialchars($attempt['full_name'] ?? 'N/A') ?></td>
-                            <td><?= htmlspecialchars($attempt['program'] ?? 'N/A') ?></td>
-                            <td><strong><?= $attempt['score'] ?></strong></td>
-                            <td><?= $attempt['total_marks'] ?></td>
-                            <td><?= round($percentage, 2) ?>%</td>
-                            <td><span class="badge status-badge <?= $grade_class ?>"><?= $grade_text ?></span></td>
-                            <td><?= $minutes ?>m <?= $seconds ?>s</td>
-                            <td><?= date('M d, Y H:i', strtotime($attempt['submit_time'])) ?></td>
-                            <td class="no-print action-col">
-                                <a href="grade_attempt.php?id=<?= $attempt['id'] ?>" class="btn btn-sm btn-outline-primary">View / Grade</a>
-                            </td>
+                            <td colspan="7" class="text-center text-muted py-4">No completed attempts yet.</td>
                         </tr>
-                    <?php endforeach; ?>
+                    <?php else: ?>
+                        <?php foreach ($attempts as $attempt): ?>
+                            <?php
+                                $start = !empty($attempt['start_time']) ? strtotime($attempt['start_time']) : false;
+                                $end = !empty($attempt['submit_time']) ? strtotime($attempt['submit_time']) : false;
+                                $duration = ($start !== false && $end !== false && $end >= $start) ? ($end - $start) : 0;
+                                $minutes = floor($duration / 60);
+                                $seconds = $duration % 60;
+                            ?>
+                            <tr>
+                                <td><?= htmlspecialchars($attempt['student_index']) ?></td>
+                                <td><?= htmlspecialchars($attempt['full_name'] ?? 'N/A') ?></td>
+                                <td><strong><?= $attempt['score'] ?></strong></td>
+                                <td><?= $attempt['total_marks'] ?></td>
+                                <td><?= $minutes ?>m <?= $seconds ?>s</td>
+                                <td><?= !empty($attempt['submit_time']) ? date('M d, Y H:i', strtotime($attempt['submit_time'])) : 'N/A' ?></td>
+                                <td class="no-print action-col">
+                                    <a href="grade_attempt.php?id=<?= $attempt['id'] ?>" class="btn btn-sm btn-outline-primary">View / Grade</a>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </tbody>
             </table>
         </div>
@@ -494,125 +478,131 @@ $csrf_token = generateCSRFToken();
     </div>
 
     <!-- PDF Export Script -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script>
         let pdfPreviewUrl = null;
+        const PDF_TITLE = 'Official Results Sheet';
+        const PDF_FILENAME = 'Results_<?= str_replace(" ", "_", preg_replace("/[^A-Za-z0-9 ]/", "", $exam["title"])) ?>.pdf';
+        const PDF_COLUMNS = ['Index Number', 'Full Name', 'Score'];
 
-        function getPdfOptions() {
+        function getResultsRows() {
+            const table = document.querySelector('.results-table');
+            if (!table) return null;
+
+            return Array.from(table.querySelectorAll('tbody tr')).map(function (tr) {
+                const tds = tr.querySelectorAll('td');
+                return [
+                    tds[0] ? tds[0].textContent.trim() : '',
+                    tds[1] ? tds[1].textContent.trim() : '',
+                    tds[2] ? tds[2].textContent.trim() : ''
+                ];
+            });
+        }
+
+        function buildPdfHeaderHtml() {
+            return `
+                <div style="text-align: center; padding: 10px 20px 15px 20px; font-family: Arial, sans-serif; background: #ffffff;">
+                    <h1 style="color: #0d6efd; margin: 0 0 5px 0; font-size: 18px;">${PDF_TITLE}</h1>
+                    <h3 style="margin: 5px 0; font-size: 14px;"><?= htmlspecialchars($exam['title']) ?></h3>
+                    <p style="margin: 5px 0; font-size: 12px;">
+                        <strong>Course:</strong> <?= htmlspecialchars($exam['course_name']) ?>
+                        <?= !empty($exam['course_code']) ? ' (' . htmlspecialchars($exam['course_code']) . ')' : '' ?>
+                    </p>
+                    <p style="color: #666; font-size: 10px; margin: 5px 0 0 0;">Generated on: ${new Date().toLocaleString()}</p>
+                    <hr style="border: 1px solid #ddd; margin: 10px 0 0 0;">
+                </div>
+            `;
+        }
+
+        function buildPdfTableFromRows(rows) {
+            const pdfTable = document.createElement('table');
+            pdfTable.style.width = '100%';
+            pdfTable.style.borderCollapse = 'collapse';
+            pdfTable.style.fontFamily = 'Arial, sans-serif';
+            pdfTable.style.fontSize = '12px';
+            pdfTable.style.color = '#111827';
+            pdfTable.style.backgroundColor = '#ffffff';
+
+            const thead = document.createElement('thead');
+            const headRow = document.createElement('tr');
+            PDF_COLUMNS.forEach(function (label) {
+                const th = document.createElement('th');
+                th.textContent = label;
+                th.style.backgroundColor = '#f8fafc';
+                th.style.color = '#111827';
+                th.style.border = '1px solid #e2e8f0';
+                th.style.padding = '8px 10px';
+                th.style.textAlign = 'left';
+                headRow.appendChild(th);
+            });
+            thead.appendChild(headRow);
+            pdfTable.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            rows.forEach(function (rowData, rowIndex) {
+                const tr = document.createElement('tr');
+                tr.style.backgroundColor = (rowIndex % 2 === 0) ? '#ffffff' : '#f9fafb';
+
+                rowData.forEach(function (cellValue) {
+                    const td = document.createElement('td');
+                    td.textContent = String(cellValue || '');
+                    td.style.backgroundColor = 'transparent';
+                    td.style.color = '#111827';
+                    td.style.border = '1px solid #e2e8f0';
+                    td.style.padding = '8px 10px';
+                    td.style.textAlign = 'left';
+                    tr.appendChild(td);
+                });
+
+                tbody.appendChild(tr);
+            });
+            pdfTable.appendChild(tbody);
+
+            return pdfTable;
+        }
+
+        function createPdfWrapperFromRows(rows, hidden = false) {
+            const wrapper = document.createElement('div');
+            wrapper.style.padding = '0';
+            wrapper.style.background = '#ffffff';
+            wrapper.style.color = '#111827';
+            wrapper.style.margin = '0';
+            wrapper.style.position = 'fixed';
+            wrapper.style.top = '0';
+            wrapper.style.left = '0';
+            wrapper.style.width = '1200px';
+            wrapper.style.zIndex = '-1';
+
+            if (hidden) {
+                wrapper.style.opacity = '0';
+                wrapper.style.pointerEvents = 'none';
+            }
+
+            const header = document.createElement('div');
+            header.innerHTML = buildPdfHeaderHtml();
+            wrapper.appendChild(header);
+            wrapper.appendChild(buildPdfTableFromRows(rows));
+
+            return wrapper;
+        }
+
+        function getHtml2PdfOptions(filename) {
             return {
-                margin:       [10, 10],
-                filename:     'Results_<?= str_replace(" ", "_", preg_replace("/[^A-Za-z0-9 ]/", "", $exam["title"])) ?>.pdf',
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  {
+                margin: [5, 5, 5, 5],
+                filename: filename,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: {
                     scale: 2,
                     useCORS: true,
                     logging: false,
                     backgroundColor: '#ffffff',
-                    onclone: (doc) => {
-                        preparePdfDocument(doc);
-                    }
+                    windowWidth: 1200
                 },
-                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+                pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
             };
         }
-
-        function preparePdfDocument(doc) {
-            const root = doc.getElementById('results-content');
-            if (!root) {
-                return;
-            }
-
-            doc.body.classList.remove('theme-dark');
-            doc.documentElement.setAttribute('data-theme', 'light');
-
-            // Set fixed width for PDF generation to ensure table doesn't compress
-            root.style.width = '1000px';
-            root.style.background = '#ffffff';
-            root.style.color = '#111827';
-            root.style.height = 'auto';
-            root.style.maxHeight = 'none';
-            root.style.overflow = 'visible';
-            root.style.setProperty('--theme-bg', '#ffffff');
-            root.style.setProperty('--theme-text', '#111827');
-            root.style.setProperty('--theme-card-bg', '#ffffff');
-            root.style.setProperty('--theme-card-border', '#e2e8f0');
-            root.style.setProperty('--theme-muted', '#64748b');
-            root.style.setProperty('--theme-table-stripe', '#f1f5f9');
-
-            // Safely remove UI elements from PDF
-            const breadcrumb = root.querySelector('nav');
-            if (breadcrumb) breadcrumb.remove();
-
-            const exportBtn = root.querySelector('#export-btn');
-            if (exportBtn) exportBtn.remove();
-
-            const previewSection = root.querySelector('.pdf-preview-section');
-            if (previewSection) previewSection.remove();
-
-            // Remove the summary cards row
-            const summaryRow = root.querySelector('.stats-grid');
-            if (summaryRow) summaryRow.remove();
-
-            const noPrintEls = root.querySelectorAll('.no-print');
-            noPrintEls.forEach(el => el.remove());
-
-            // Remove PDF-only columns: Total Marks, %, Grading
-            const pdfTable = root.querySelector('.results-table');
-            if (pdfTable) {
-                const headerCells = Array.from(pdfTable.querySelectorAll('thead th'));
-                const removeLabels = ['Total Marks', '%', 'Grading'];
-                const removeIndexes = headerCells
-                    .map((th, idx) => ({ text: th.textContent.trim(), idx }))
-                    .filter(item => removeLabels.includes(item.text))
-                    .map(item => item.idx)
-                    .sort((a, b) => b - a);
-
-                if (removeIndexes.length) {
-                    const rows = pdfTable.querySelectorAll('tr');
-                    rows.forEach(row => {
-                        const cells = row.children;
-                        removeIndexes.forEach(i => {
-                            if (cells[i]) {
-                                cells[i].remove();
-                            }
-                        });
-                    });
-                }
-            }
-
-            // Remove the original page heading div (we have the custom PDF header)
-            const pageHeading = root.querySelector('.results-hero');
-            if (pageHeading) pageHeading.remove();
-
-            const tableCard = root.querySelector('.table-card');
-            if (tableCard) {
-                tableCard.style.overflow = 'visible';
-                tableCard.style.maxHeight = 'none';
-                tableCard.style.height = 'auto';
-            }
-
-            const existingHeader = root.querySelector('.pdf-generated-header');
-            if (existingHeader) {
-                existingHeader.remove();
-            }
-
-            const header = doc.createElement('div');
-            header.className = 'pdf-generated-header';
-            header.innerHTML = `
-                <div style="text-align: center; margin-bottom: 20px; font-family: Arial, sans-serif;">
-                    <h1 style="color: #0d6efd; margin-bottom: 5px;">Official Exam Result Sheet</h1>
-                    <h3 style="margin-bottom: 5px;"><?= htmlspecialchars($exam['title']) ?></h3>
-                    <p style="margin-bottom: 5px;">
-                        <strong>Course:</strong> <?= htmlspecialchars($exam['course_name']) ?>
-                        <?= !empty($exam['course_code']) ? ' (' . htmlspecialchars($exam['course_code']) . ')' : '' ?>
-                    </p>
-                    <p style="color: #666; font-size: 12px;">Generated on: ${new Date().toLocaleString()}</p>
-                    <hr style="border: 1px solid #ddd;">
-                </div>
-            `;
-            root.prepend(header);
-        }
-
         function setPreviewMessage(message, isError = false) {
             const placeholder = document.getElementById('pdf-preview-placeholder');
             if (!placeholder) return;
@@ -649,175 +639,180 @@ $csrf_token = generateCSRFToken();
             }
         }
 
-        function exportToPDF() {
+        async function exportToPDF() {
             const btn = document.getElementById('export-btn');
             const originalText = btn.innerHTML;
+            const rows = getResultsRows();
 
-            // Get only the table card for export
-            const tableCard = document.querySelector('.table-card');
-            if (!tableCard) {
+            if (!rows) {
                 alert('Unable to locate results table for export.');
                 return;
             }
 
-            // Create a wrapper for PDF content
-            const wrapper = document.createElement('div');
-            wrapper.style.padding = '0';
-            wrapper.style.background = '#ffffff';
-            wrapper.style.margin = '0';
-            wrapper.style.position = 'absolute';
-            wrapper.style.top = '0';
-            wrapper.style.left = '0';
+            const tryHtml2PdfFallback = function () {
+                return new Promise(function (resolve, reject) {
+                    if (typeof html2pdf !== 'function') {
+                        reject(new Error('html2pdf is not available'));
+                        return;
+                    }
 
-            // Add header
-            const header = document.createElement('div');
-            header.innerHTML = `
-                <div style="text-align: center; padding: 10px 20px 15px 20px; font-family: Arial, sans-serif; background: #ffffff;">
-                    <h1 style="color: #0d6efd; margin: 0 0 5px 0; font-size: 18px;">Official Exam Result Sheet</h1>
-                    <h3 style="margin: 5px 0; font-size: 14px;"><?= htmlspecialchars($exam['title']) ?></h3>
-                    <p style="margin: 5px 0; font-size: 12px;">
-                        <strong>Course:</strong> <?= htmlspecialchars($exam['course_name']) ?>
-                        <?= !empty($exam['course_code']) ? ' (' . htmlspecialchars($exam['course_code']) . ')' : '' ?>
-                    </p>
-                    <p style="color: #666; font-size: 10px; margin: 5px 0 0 0;">Generated on: ${new Date().toLocaleString()}</p>
-                    <hr style="border: 1px solid #ddd; margin: 10px 0 0 0;">
-                </div>
-            `;
-            wrapper.appendChild(header);
+                    const wrapper = createPdfWrapperFromRows(rows, true);
+                    document.body.appendChild(wrapper);
 
-            // Clone table for export (without action, total marks, %, grading columns)
-            const tableClone = tableCard.cloneNode(true);
-            tableClone.style.margin = '0';
-            tableClone.style.width = '100%';
-            const actionCols = tableClone.querySelectorAll('.no-print');
-            actionCols.forEach(el => el.remove());
-
-            // Remove Total Marks, %, Grading columns from PDF
-            const headerCells = Array.from(tableClone.querySelectorAll('thead th'));
-            const removeLabels = ['Total Marks', '%', 'Grading'];
-            const removeIndexes = headerCells
-                .map((th, idx) => ({ text: th.textContent.trim(), idx }))
-                .filter(item => removeLabels.includes(item.text))
-                .map(item => item.idx)
-                .sort((a, b) => b - a);
-
-            if (removeIndexes.length) {
-                const rows = tableClone.querySelectorAll('tr');
-                rows.forEach(row => {
-                    const cells = row.children;
-                    removeIndexes.forEach(i => {
-                        if (cells[i]) {
-                            cells[i].remove();
+                    const cleanup = function () {
+                        if (wrapper && wrapper.parentNode) {
+                            wrapper.parentNode.removeChild(wrapper);
                         }
+                    };
+
+                    html2pdf().set(getHtml2PdfOptions(PDF_FILENAME)).from(wrapper).save().then(function () {
+                        cleanup();
+                        resolve();
+                    }).catch(function (err) {
+                        cleanup();
+                        reject(err);
                     });
                 });
-            }
+            };
 
-            wrapper.appendChild(tableClone);
-            
-            // Show loading state
             btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Generating PDF...';
             btn.disabled = true;
 
             try {
-                const opt = {
-                    margin: [5, 5, 5, 5],
-                    filename: 'Results_<?= str_replace(" ", "_", preg_replace("/[^A-Za-z0-9 ]/", "", $exam["title"])) ?>.pdf',
-                    image: { type: 'jpeg', quality: 0.98 },
-                    html2canvas: {
-                        scale: 2,
-                        useCORS: true,
-                        logging: false,
-                        backgroundColor: '#ffffff',
-                        windowWidth: 1200
-                    },
-                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-                    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-                };
+                const JsPdfCtor = (window.jspdf && window.jspdf.jsPDF) ? window.jspdf.jsPDF : (window.jsPDF || null);
 
-                html2pdf().set(opt).from(wrapper).save().then(() => {
-                    btn.innerHTML = originalText;
-                    btn.disabled = false;
-                }).catch(err => {
-                    console.error("PDF Error:", err);
-                    alert("Failed to generate PDF. Please try again or use Ctrl+P to print.");
-                    btn.innerHTML = originalText;
-                    btn.disabled = false;
-                });
-            } catch (e) {
-                console.error("Script Error:", e);
-                alert("An error occurred: " + e.message);
+                if (!JsPdfCtor) {
+                    await tryHtml2PdfFallback();
+                } else {
+                    const doc = new JsPdfCtor({ unit: 'mm', format: 'a4', orientation: 'landscape' });
+                    const pageWidth = doc.internal.pageSize.getWidth();
+                    const pageHeight = doc.internal.pageSize.getHeight();
+                    const marginX = 10;
+                    const marginY = 10;
+                    const usableWidth = pageWidth - (marginX * 2);
+                    const colWidths = [
+                        Math.round(usableWidth * 0.22),
+                        Math.round(usableWidth * 0.56),
+                        Math.round(usableWidth * 0.22)
+                    ];
+
+                    const tableX = marginX;
+                    const rowHeight = 8;
+                    const headerRowHeight = 9;
+                    let y = marginY;
+
+                    const drawTitleBlock = function () {
+                        doc.setFont('helvetica', 'bold');
+                        doc.setFontSize(16);
+                        doc.text(PDF_TITLE, pageWidth / 2, y, { align: 'center' });
+                        y += 7;
+
+                        doc.setFontSize(12);
+                        doc.text('<?= htmlspecialchars($exam['title']) ?>', pageWidth / 2, y, { align: 'center' });
+                        y += 6;
+
+                        doc.setFont('helvetica', 'normal');
+                        doc.setFontSize(10);
+                        doc.text('Course: <?= htmlspecialchars($exam['course_name']) ?><?= !empty($exam['course_code']) ? ' (' . htmlspecialchars($exam['course_code']) . ')' : '' ?>', pageWidth / 2, y, { align: 'center' });
+                        y += 5;
+                        doc.text('Generated on: ' + new Date().toLocaleString(), pageWidth / 2, y, { align: 'center' });
+                        y += 5;
+
+                        doc.setDrawColor(210, 210, 210);
+                        doc.line(marginX, y, pageWidth - marginX, y);
+                        y += 4;
+                    };
+
+                    const drawTableHeader = function () {
+                        let x = tableX;
+
+                        doc.setFont('helvetica', 'bold');
+                        doc.setFontSize(10);
+                        doc.setTextColor(17, 24, 39);
+
+                        PDF_COLUMNS.forEach(function (label, idx) {
+                            doc.text(label, x + 1.5, y + 5.5);
+                            x += colWidths[idx];
+                        });
+
+                        doc.setDrawColor(226, 232, 240);
+                        doc.line(tableX, y + 7, tableX + usableWidth, y + 7);
+                        y += headerRowHeight;
+                    };
+
+                    const drawRow = function (cells) {
+                        let x = tableX;
+                        doc.setFont('helvetica', 'normal');
+                        doc.setFontSize(10);
+                        doc.setTextColor(17, 24, 39);
+
+                        cells.forEach(function (value, idx) {
+                            const text = String(value || '');
+                            const lines = doc.splitTextToSize(text, colWidths[idx] - 3);
+                            const clipped = lines.length ? lines[0] : '';
+                            doc.text(clipped, x + 1.5, y + 5.5);
+                            x += colWidths[idx];
+                        });
+
+                        doc.setDrawColor(241, 245, 249);
+                        doc.line(tableX, y + rowHeight - 1, tableX + usableWidth, y + rowHeight - 1);
+                        y += rowHeight;
+                    };
+
+                    drawTitleBlock();
+                    drawTableHeader();
+
+                    if (!rows.length) {
+                        doc.setFont('helvetica', 'italic');
+                        doc.setFontSize(10);
+                        doc.text('No results available.', tableX + 2, y + 6);
+                    } else {
+                        rows.forEach(function (cells) {
+                            if (y + rowHeight > pageHeight - marginY) {
+                                doc.addPage();
+                                y = marginY;
+                                drawTitleBlock();
+                                drawTableHeader();
+                            }
+                            drawRow(cells);
+                        });
+                    }
+
+                    doc.save(PDF_FILENAME);
+                }
+            } catch (err) {
+                console.error('Primary PDF export failed:', err);
+                try {
+                    await tryHtml2PdfFallback();
+                } catch (fallbackErr) {
+                    console.error('Fallback PDF export failed:', fallbackErr);
+                    const msg = (fallbackErr && fallbackErr.message) ? fallbackErr.message : 'Unknown error';
+                    alert('Failed to generate PDF. Please try again. (' + msg + ')');
+                }
+            } finally {
                 btn.innerHTML = originalText;
                 btn.disabled = false;
             }
         }
-
         function previewPDF() {
             const btn = document.getElementById('preview-btn');
             const clearBtn = document.getElementById('clear-preview-btn');
             const originalText = btn.innerHTML;
+            const rows = getResultsRows();
 
-            // Get only the table card for preview
-            const tableCard = document.querySelector('.table-card');
-            if (!tableCard) {
+            if (!rows) {
                 setPreviewMessage('Unable to locate results table for preview.', true);
                 return;
             }
 
-            // Create a wrapper for PDF content
-            const wrapper = document.createElement('div');
-            wrapper.style.padding = '0';
-            wrapper.style.background = '#ffffff';
-            wrapper.style.margin = '0';
-            wrapper.style.position = 'absolute';
-            wrapper.style.top = '0';
-            wrapper.style.left = '0';
+            const wrapper = createPdfWrapperFromRows(rows, true);
+            document.body.appendChild(wrapper);
 
-            // Add header
-            const header = document.createElement('div');
-            header.innerHTML = `
-                <div style="text-align: center; padding: 10px 20px 15px 20px; font-family: Arial, sans-serif; background: #ffffff;">
-                    <h1 style="color: #0d6efd; margin: 0 0 5px 0; font-size: 18px;">Official Exam Result Sheet</h1>
-                    <h3 style="margin: 5px 0; font-size: 14px;"><?= htmlspecialchars($exam['title']) ?></h3>
-                    <p style="margin: 5px 0; font-size: 12px;">
-                        <strong>Course:</strong> <?= htmlspecialchars($exam['course_name']) ?>
-                        <?= !empty($exam['course_code']) ? ' (' . htmlspecialchars($exam['course_code']) . ')' : '' ?>
-                    </p>
-                    <p style="color: #666; font-size: 10px; margin: 5px 0 0 0;">Generated on: ${new Date().toLocaleString()}</p>
-                    <hr style="border: 1px solid #ddd; margin: 10px 0 0 0;">
-                </div>
-            `;
-            wrapper.appendChild(header);
-
-            // Clone table for preview (without action, total marks, %, grading columns)
-            const tableClone = tableCard.cloneNode(true);
-            tableClone.style.margin = '0';
-            tableClone.style.width = '100%';
-            const actionCols = tableClone.querySelectorAll('.no-print');
-            actionCols.forEach(el => el.remove());
-
-            // Remove Total Marks, %, Grading columns from preview
-            const headerCells = Array.from(tableClone.querySelectorAll('thead th'));
-            const removeLabels = ['Total Marks', '%', 'Grading'];
-            const removeIndexes = headerCells
-                .map((th, idx) => ({ text: th.textContent.trim(), idx }))
-                .filter(item => removeLabels.includes(item.text))
-                .map(item => item.idx)
-                .sort((a, b) => b - a);
-
-            if (removeIndexes.length) {
-                const rows = tableClone.querySelectorAll('tr');
-                rows.forEach(row => {
-                    const cells = row.children;
-                    removeIndexes.forEach(i => {
-                        if (cells[i]) {
-                            cells[i].remove();
-                        }
-                    });
-                });
-            }
-
-            wrapper.appendChild(tableClone);
+            const cleanup = function () {
+                if (wrapper && wrapper.parentNode) {
+                    wrapper.parentNode.removeChild(wrapper);
+                }
+            };
 
             btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Generating Preview...';
             btn.disabled = true;
@@ -829,22 +824,8 @@ $csrf_token = generateCSRFToken();
             }
 
             try {
-                const opt = {
-                    margin: [5, 5, 5, 5],
-                    filename: 'Results_<?= str_replace(" ", "_", preg_replace("/[^A-Za-z0-9 ]/", "", $exam["title"])) ?>.pdf',
-                    image: { type: 'jpeg', quality: 0.98 },
-                    html2canvas: {
-                        scale: 2,
-                        useCORS: true,
-                        logging: false,
-                        backgroundColor: '#ffffff',
-                        windowWidth: 1200
-                    },
-                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-                    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-                };
-
-                html2pdf().set(opt).from(wrapper).toPdf().get('pdf').then(pdf => {
+                html2pdf().set(getHtml2PdfOptions(PDF_FILENAME)).from(wrapper).toPdf().get('pdf').then(pdf => {
+                    cleanup();
                     const blob = pdf.output('blob');
                     pdfPreviewUrl = URL.createObjectURL(blob);
                     showPreviewFrame(pdfPreviewUrl);
@@ -852,19 +833,20 @@ $csrf_token = generateCSRFToken();
                     btn.disabled = false;
                     if (clearBtn) clearBtn.disabled = false;
                 }).catch(err => {
-                    console.error("Preview Error:", err);
-                    setPreviewMessage("Failed to generate preview. Please try again.", true);
+                    cleanup();
+                    console.error('Preview Error:', err);
+                    setPreviewMessage('Failed to generate preview. Please try again.', true);
                     btn.innerHTML = originalText;
                     btn.disabled = false;
                 });
             } catch (e) {
-                console.error("Preview Script Error:", e);
-                setPreviewMessage("An error occurred while generating the preview.", true);
+                cleanup();
+                console.error('Preview Script Error:', e);
+                setPreviewMessage('An error occurred while generating the preview.', true);
                 btn.innerHTML = originalText;
                 btn.disabled = false;
             }
         }
-
         function clearPreview() {
             const frame = document.getElementById('pdf-preview-frame');
             const clearBtn = document.getElementById('clear-preview-btn');
@@ -886,3 +868,13 @@ $csrf_token = generateCSRFToken();
     <script defer src="theme.js"></script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+

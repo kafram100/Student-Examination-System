@@ -403,6 +403,15 @@ $csrf_token = generateCSRFToken();
                 </a>
             </div>
             <div class="col-md-4">
+                <a href="download_template.php" class="quick-action">
+                    <i class="bi bi-download" style="background: var(--primary);"></i>
+                    <div>
+                        <div class="fw-semibold">Question Template</div>
+                        <small class="text-muted">Download CSV template for bulk import</small>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-4">
                 <a href="proctoring_monitor.php" class="quick-action">
                     <i class="bi bi-camera-video-fill" style="background: var(--danger);"></i>
                     <div>
